@@ -82,6 +82,7 @@ import net.runelite.client.plugins.PluginManager;
 import net.runelite.client.task.Scheduler;
 import net.runelite.client.ui.ClientUI;
 import net.runelite.client.ui.DrawManager;
+import net.runelite.client.ui.overlay.NativeOverlayBuffer;
 import net.runelite.client.ui.overlay.OverlayLayer;
 import net.runelite.client.ui.overlay.OverlayRenderer;
 import net.runelite.client.ui.overlay.infobox.InfoBoxManager;
@@ -473,11 +474,17 @@ public class Hooks implements Callbacks
 					: RenderingHints.VALUE_INTERPOLATION_BILINEAR);
 			stretchedGraphics.drawImage(image, 0, 0, stretchedDimensions.width, stretchedDimensions.height, null);
 
-			BufferedImage nativeOverlays = renderer.getNativeOverlayBuffer().getImage();
-			if (renderer.getNativeOverlayBuffer().isActive() && nativeOverlays != null)
+			var nativeBuffer = renderer.getNativeOverlayBuffer();
+			if (nativeBuffer.isActive())
 			{
-				stretchedGraphics.setComposite(AlphaComposite.SrcOver);
-				stretchedGraphics.drawImage(nativeOverlays, 0, 0, null);
+				// Under-UI overlays stay in the canvas on the CPU path so the bank covers them.
+				// Only above-UI overlays are composited here after stretch.
+				BufferedImage above = nativeBuffer.getImage(NativeOverlayBuffer.Pass.ABOVE_UI);
+				if (above != null)
+				{
+					stretchedGraphics.setComposite(AlphaComposite.SrcOver);
+					stretchedGraphics.drawImage(above, 0, 0, null);
+				}
 			}
 
 			finalImage = stretchedImage;

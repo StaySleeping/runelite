@@ -1537,9 +1537,10 @@ public class GpuPlugin extends Plugin implements DrawCallbacks
 			blitSceneFbo();
 		}
 
-		// Texture on UI
+		// Texture on UI — under-UI overlays sit between scene and interfaces (bank, etc.)
+		drawNativeOverlays(NativeOverlayBuffer.Pass.UNDER_UI);
 		drawUi(overlayColor, canvasHeight, canvasWidth);
-		drawNativeOverlays();
+		drawNativeOverlays(NativeOverlayBuffer.Pass.ABOVE_UI);
 
 		try
 		{
@@ -1632,17 +1633,18 @@ public class GpuPlugin extends Plugin implements DrawCallbacks
 	}
 
 	/**
-	 * Composite the native-resolution overlay buffer on top of the stretched UI.
+	 * Composite a native-resolution overlay pass. UNDER_UI is drawn before the stretched
+	 * game UI; ABOVE_UI after — matching OverlayLayer under/above widget ordering.
 	 */
-	private void drawNativeOverlays()
+	private void drawNativeOverlays(NativeOverlayBuffer.Pass pass)
 	{
 		if (!nativeOverlayBuffer.isActive())
 		{
 			return;
 		}
 
-		BufferedImage overlayImage = nativeOverlayBuffer.getImage();
-		int[] pixels = nativeOverlayBuffer.getPremultipliedPixels();
+		BufferedImage overlayImage = nativeOverlayBuffer.getImage(pass);
+		int[] pixels = nativeOverlayBuffer.getPremultipliedPixels(pass);
 		if (overlayImage == null || pixels == null)
 		{
 			return;

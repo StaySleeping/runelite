@@ -40,6 +40,7 @@ import java.awt.BasicStroke;
 import java.awt.Stroke;
 import java.awt.event.MouseEvent;
 import java.awt.geom.AffineTransform;
+import java.awt.image.BufferedImage;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.List;
@@ -283,7 +284,10 @@ public class OverlayRenderer extends MouseAdapter
 			return;
 		}
 
-		final boolean nativePass = nativeOverlayBuffer.isActive();
+		// On CPU, only post-UI layers can use the native buffer while still sitting under the bank:
+		// the software frame already merges scene+widgets, so under-UI native composits would draw on top.
+		final boolean nativePass = nativeOverlayBuffer.isActive()
+			&& (client.isGpu() || NativeOverlayBuffer.isAboveUiLayer(layer));
 		Graphics2D drawGraphics = graphics;
 		Graphics2D nativeGraphics = null;
 		final double scaleX;
@@ -292,11 +296,12 @@ public class OverlayRenderer extends MouseAdapter
 		if (nativePass)
 		{
 			nativeOverlayBuffer.prepareFrame();
-			if (nativeOverlayBuffer.getImage() == null)
+			BufferedImage target = nativeOverlayBuffer.getImage(nativeOverlayBuffer.passForLayer(layer));
+			if (target == null)
 			{
 				return;
 			}
-			nativeGraphics = nativeOverlayBuffer.getImage().createGraphics();
+			nativeGraphics = target.createGraphics();
 			scaleX = nativeOverlayBuffer.getScaleX();
 			scaleY = nativeOverlayBuffer.getScaleY();
 			OverlayUtil.setGraphicProperties(nativeGraphics);
@@ -898,7 +903,7 @@ public class OverlayRenderer extends MouseAdapter
 	}
 
 	/**
-	 * Creates a Graphics2D into the native overlay buffer with stretch scale applied.
+	 * Creates a Graphics2D into the above-UI native overlay buffer with stretch scale applied.
 	 * Caller must dispose. Returns null if native pass is inactive.
 	 */
 	public Graphics2D createNativeOverlayGraphics()
@@ -908,11 +913,12 @@ public class OverlayRenderer extends MouseAdapter
 			return null;
 		}
 		nativeOverlayBuffer.prepareFrame();
-		if (nativeOverlayBuffer.getImage() == null)
+		BufferedImage target = nativeOverlayBuffer.getImage(NativeOverlayBuffer.Pass.ABOVE_UI);
+		if (target == null)
 		{
 			return null;
 		}
-		Graphics2D g = nativeOverlayBuffer.getImage().createGraphics();
+		Graphics2D g = target.createGraphics();
 		OverlayUtil.setGraphicProperties(g);
 		g.scale(nativeOverlayBuffer.getScaleX(), nativeOverlayBuffer.getScaleY());
 		return g;

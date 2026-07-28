@@ -650,7 +650,7 @@ public class ModelOutlineRenderer
 	{
 		if (nativePass)
 		{
-			return nativeOverlayBuffer.getImage();
+			return nativeOverlayBuffer.getImage(NativeOverlayBuffer.Pass.UNDER_UI);
 		}
 		MainBufferProvider bufferProvider = (MainBufferProvider) client.getBufferProvider();
 		return (BufferedImage) bufferProvider.getImage();
@@ -962,7 +962,7 @@ public class ModelOutlineRenderer
 		croppedY1 = Integer.MAX_VALUE;
 		croppedY2 = Integer.MIN_VALUE;
 
-		nativePass = nativeOverlayBuffer.isActive();
+		nativePass = nativeOverlayBuffer.isActive() && client.isGpu();
 		if (nativePass)
 		{
 			nativeOverlayBuffer.prepareFrame();

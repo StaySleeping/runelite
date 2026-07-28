@@ -25,30 +25,45 @@
 package net.runelite.client.ui.overlay;
 
 import java.awt.Dimension;
-import java.awt.Graphics2D;
 import java.awt.image.BufferedImage;
 import java.awt.image.DataBufferInt;
 import java.util.Arrays;
 import javax.inject.Inject;
 import javax.inject.Singleton;
-import lombok.Getter;
 import net.runelite.api.Client;
 import net.runelite.client.config.OverlaySizeMode;
 import net.runelite.client.config.RuneLiteConfig;
 
 /**
- * Offscreen buffer for drawing RuneLite overlays at stretched (display) resolution
+ * Offscreen buffers for drawing RuneLite overlays at stretched (display) resolution
  * so they are not upscaled with the game UI.
+ * <p>
+ * Two passes mirror {@link OverlayLayer} ordering relative to game interfaces:
+ * under-UI ({@link OverlayLayer#ABOVE_SCENE}, {@link OverlayLayer#UNDER_WIDGETS})
+ * and above-UI ({@link OverlayLayer#ABOVE_WIDGETS}, {@link OverlayLayer#ALWAYS_ON_TOP}).
  */
 @Singleton
 public class NativeOverlayBuffer
 {
+	public enum Pass
+	{
+		/**
+		 * Drawn after the scene and before the game UI (bank, inventory, etc.).
+		 */
+		UNDER_UI,
+		/**
+		 * Drawn after the game UI (tooltips, overlays moved over interfaces, etc.).
+		 */
+		ABOVE_UI
+	}
+
 	private final Client client;
 	private final RuneLiteConfig runeLiteConfig;
 
-	@Getter
-	private BufferedImage image;
-	private int[] premultipliedUpload;
+	private BufferedImage underImage;
+	private BufferedImage aboveImage;
+	private int[] underPremultipliedUpload;
+	private int[] abovePremultipliedUpload;
 	private int frameId;
 	private int preparedFrameId = -1;
 
@@ -62,6 +77,19 @@ public class NativeOverlayBuffer
 	public boolean isActive()
 	{
 		return client.isStretchedEnabled() && runeLiteConfig.nativeResolutionOverlays();
+	}
+
+	/**
+	 * Whether this overlay layer should be composited above the game UI.
+	 */
+	public static boolean isAboveUiLayer(OverlayLayer layer)
+	{
+		return layer == OverlayLayer.ABOVE_WIDGETS || layer == OverlayLayer.ALWAYS_ON_TOP;
+	}
+
+	public Pass passForLayer(OverlayLayer layer)
+	{
+		return isAboveUiLayer(layer) ? Pass.ABOVE_UI : Pass.UNDER_UI;
 	}
 
 	public double getScaleX()
@@ -148,7 +176,7 @@ public class NativeOverlayBuffer
 	}
 
 	/**
-	 * Ensures the buffer exists and is cleared once per client frame.
+	 * Ensures both buffers exist and are cleared once per client frame.
 	 */
 	public void prepareFrame()
 	{
@@ -159,19 +187,33 @@ public class NativeOverlayBuffer
 		}
 
 		Dimension dim = client.getStretchedDimensions();
-		if (image == null || image.getWidth() != dim.width || image.getHeight() != dim.height)
+		BufferedImage newUnder = ensureImage(underImage, dim);
+		BufferedImage newAbove = ensureImage(aboveImage, dim);
+		if (newUnder != underImage || newAbove != aboveImage)
 		{
-			image = new BufferedImage(dim.width, dim.height, BufferedImage.TYPE_INT_ARGB);
-			premultipliedUpload = null;
+			underPremultipliedUpload = null;
+			abovePremultipliedUpload = null;
 			preparedFrameId = -1;
 		}
+		underImage = newUnder;
+		aboveImage = newAbove;
 
 		int currentFrame = frameId;
 		if (preparedFrameId != currentFrame)
 		{
-			Arrays.fill(getPixels(), 0);
+			Arrays.fill(getPixels(Pass.UNDER_UI), 0);
+			Arrays.fill(getPixels(Pass.ABOVE_UI), 0);
 			preparedFrameId = currentFrame;
 		}
+	}
+
+	private static BufferedImage ensureImage(BufferedImage image, Dimension dim)
+	{
+		if (image == null || image.getWidth() != dim.width || image.getHeight() != dim.height)
+		{
+			return new BufferedImage(dim.width, dim.height, BufferedImage.TYPE_INT_ARGB);
+		}
+		return image;
 	}
 
 	public void nextFrame()
@@ -179,8 +221,14 @@ public class NativeOverlayBuffer
 		frameId++;
 	}
 
-	public int[] getPixels()
+	public BufferedImage getImage(Pass pass)
 	{
+		return pass == Pass.ABOVE_UI ? aboveImage : underImage;
+	}
+
+	public int[] getPixels(Pass pass)
+	{
+		BufferedImage image = getImage(pass);
 		if (image == null)
 		{
 			return null;
@@ -191,16 +239,25 @@ public class NativeOverlayBuffer
 	/**
 	 * Returns a reusable buffer of premultiplied ARGB pixels for GL upload.
 	 */
-	public int[] getPremultipliedPixels()
+	public int[] getPremultipliedPixels(Pass pass)
 	{
-		int[] src = getPixels();
+		int[] src = getPixels(pass);
 		if (src == null)
 		{
 			return null;
 		}
-		if (premultipliedUpload == null || premultipliedUpload.length != src.length)
+		int[] dest = pass == Pass.ABOVE_UI ? abovePremultipliedUpload : underPremultipliedUpload;
+		if (dest == null || dest.length != src.length)
 		{
-			premultipliedUpload = new int[src.length];
+			dest = new int[src.length];
+			if (pass == Pass.ABOVE_UI)
+			{
+				abovePremultipliedUpload = dest;
+			}
+			else
+			{
+				underPremultipliedUpload = dest;
+			}
 		}
 		for (int i = 0; i < src.length; i++)
 		{
@@ -208,30 +265,32 @@ public class NativeOverlayBuffer
 			int a = (p >>> 24) & 0xFF;
 			if (a == 0)
 			{
-				premultipliedUpload[i] = 0;
+				dest[i] = 0;
 			}
 			else if (a == 255)
 			{
-				premultipliedUpload[i] = p;
+				dest[i] = p;
 			}
 			else
 			{
 				int r = (p >>> 16) & 0xFF;
 				int g = (p >>> 8) & 0xFF;
 				int b = p & 0xFF;
-				premultipliedUpload[i] = (a << 24)
+				dest[i] = (a << 24)
 					| (((r * a + 127) / 255) << 16)
 					| (((g * a + 127) / 255) << 8)
 					| ((b * a + 127) / 255);
 			}
 		}
-		return premultipliedUpload;
+		return dest;
 	}
 
 	public void release()
 	{
-		image = null;
-		premultipliedUpload = null;
+		underImage = null;
+		aboveImage = null;
+		underPremultipliedUpload = null;
+		abovePremultipliedUpload = null;
 		preparedFrameId = -1;
 	}
 }
