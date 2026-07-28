@@ -32,6 +32,7 @@ import java.awt.FontMetrics;
 import java.awt.Graphics2D;
 import java.awt.Point;
 import java.awt.Rectangle;
+import java.awt.RenderingHints;
 import java.awt.image.BufferedImage;
 import java.util.Arrays;
 import java.util.concurrent.Future;
@@ -56,7 +57,6 @@ import net.runelite.client.plugins.puzzlesolver.solver.pathfinding.IDAStarMM;
 import net.runelite.client.ui.overlay.Overlay;
 import net.runelite.client.ui.overlay.OverlayLayer;
 import net.runelite.client.ui.overlay.OverlayPosition;
-import net.runelite.client.ui.overlay.OverlayUtil;
 import net.runelite.client.ui.overlay.components.BackgroundComponent;
 import net.runelite.client.ui.overlay.components.TextComponent;
 import net.runelite.client.util.ColorUtil;
@@ -312,14 +312,16 @@ public class PuzzleSolverOverlay extends Overlay
 										continue;
 									}
 
-									Dimension arrowSize = OverlayUtil.getImageLayoutSize(graphics, arrow);
+									// Keep pre-native visual size: draw under the stretch transform
+									// (same contract as the solution dots), not OverlayUtil inverse-scale.
 									int x = puzzleBoxLocation.getX() + blankX * PUZZLE_TILE_SIZE
-											+ PUZZLE_TILE_SIZE / 2 - arrowSize.width / 2 - 1;
+											+ PUZZLE_TILE_SIZE / 2 - arrow.getWidth() / 2 - 1;
 
 									int y = puzzleBoxLocation.getY() + blankY * PUZZLE_TILE_SIZE
-											+ PUZZLE_TILE_SIZE / 2 - arrowSize.height / 2 - 1;
+											+ PUZZLE_TILE_SIZE / 2 - arrow.getHeight() / 2 - 1;
 
-									OverlayUtil.renderImageLocationExact(graphics, new net.runelite.api.Point(x, y), arrow);
+									graphics.setRenderingHint(RenderingHints.KEY_INTERPOLATION, RenderingHints.VALUE_INTERPOLATION_BILINEAR);
+									graphics.drawImage(arrow, x, y, null);
 
 									lastBlankX = blankX;
 									lastBlankY = blankY;
