@@ -356,7 +356,12 @@ public class OverlayRenderer extends MouseAdapter
 				&& overlayPosition != OverlayPosition.DETACHED && preferredLocation == null)
 			{
 				snapCorner = snapCorners.forPosition(overlayPosition);
-				snapCorner.getNextDrawPosition(bounds, location);
+				// Align using visual size so right/bottom anchors sit flush when scaled
+				Rectangle alignBounds = new Rectangle(bounds);
+				Rectangle visual = getVisualSize(overlay, bounds.width, bounds.height);
+				alignBounds.width = visual.width;
+				alignBounds.height = visual.height;
+				snapCorner.getNextDrawPosition(alignBounds, location);
 			}
 			else if (preferredLocation != null)
 			{
@@ -378,10 +383,10 @@ public class OverlayRenderer extends MouseAdapter
 
 			safeRender(overlay, graphics, location, nativePass, scaleX, scaleY);
 
-			// Adjust snap corner based on where the overlay was drawn
+			// Adjust snap corner based on where the overlay was drawn (visual bounds)
 			if (snapCorner != null && bounds.width + bounds.height > 0)
 			{
-				snapCorner.shift(bounds, PADDING);
+				snapCorner.shift(getHitBounds(overlay), PADDING);
 			}
 
 			// Restore graphics2d properties prior to drawing bounds
