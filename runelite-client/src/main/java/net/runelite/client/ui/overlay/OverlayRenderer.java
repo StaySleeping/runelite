@@ -459,10 +459,12 @@ public class OverlayRenderer extends MouseAdapter
 
 	/**
 	 * Canvas-space width/height after native overlay sizing (size mode + overlay scale).
+	 * Widget overlays only reposition client widgets (which follow UI stretch), so they
+	 * keep logical size for hit-testing, clamp, and Alt bounds.
 	 */
 	private Rectangle getVisualSize(Overlay overlay, int logicalWidth, int logicalHeight)
 	{
-		if (!nativeOverlayBuffer.isActive())
+		if (!nativeOverlayBuffer.isActive() || overlay instanceof WidgetOverlays.WidgetOverlay)
 		{
 			return new Rectangle(0, 0, logicalWidth, logicalHeight);
 		}
