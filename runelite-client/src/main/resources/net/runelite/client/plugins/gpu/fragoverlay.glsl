@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2026, StaySleeping <StaySleeping@users.noreply.github.com>
+ * Copyright (c) 2026, StaySleeping <https://github.com/StaySleeping>
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
