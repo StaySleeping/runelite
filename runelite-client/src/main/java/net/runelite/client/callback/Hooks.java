@@ -24,6 +24,7 @@
  */
 package net.runelite.client.callback;
 
+import java.awt.AlphaComposite;
 import java.awt.Dimension;
 import java.awt.Graphics;
 import java.awt.Graphics2D;
@@ -403,10 +404,21 @@ public class Hooks implements Callbacks
 			log.error("Error during overlay rendering", ex);
 		}
 
-		notifier.processFlash(graphics2d);
-
-		// Draw clientUI overlays
-		clientUi.paintOverlays(graphics2d);
+		Graphics2D overlayGraphics = renderer.createNativeOverlayGraphics();
+		try
+		{
+			Graphics2D flashAndUiGraphics = overlayGraphics != null ? overlayGraphics : graphics2d;
+			notifier.processFlash(flashAndUiGraphics);
+			// Draw clientUI overlays
+			clientUi.paintOverlays(flashAndUiGraphics);
+		}
+		finally
+		{
+			if (overlayGraphics != null)
+			{
+				overlayGraphics.dispose();
+			}
+		}
 
 		if (client.isGpu())
 		{
@@ -460,6 +472,13 @@ public class Hooks implements Callbacks
 					? RenderingHints.VALUE_INTERPOLATION_NEAREST_NEIGHBOR
 					: RenderingHints.VALUE_INTERPOLATION_BILINEAR);
 			stretchedGraphics.drawImage(image, 0, 0, stretchedDimensions.width, stretchedDimensions.height, null);
+
+			BufferedImage nativeOverlays = renderer.getNativeOverlayBuffer().getImage();
+			if (renderer.getNativeOverlayBuffer().isActive() && nativeOverlays != null)
+			{
+				stretchedGraphics.setComposite(AlphaComposite.SrcOver);
+				stretchedGraphics.drawImage(nativeOverlays, 0, 0, null);
+			}
 
 			finalImage = stretchedImage;
 		}

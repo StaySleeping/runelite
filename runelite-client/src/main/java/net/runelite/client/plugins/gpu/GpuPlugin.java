@@ -76,6 +76,7 @@ import net.runelite.client.plugins.gpu.config.UIScalingMode;
 import net.runelite.client.plugins.gpu.template.Template;
 import net.runelite.client.ui.ClientUI;
 import net.runelite.client.ui.DrawManager;
+import net.runelite.client.ui.overlay.NativeOverlayBuffer;
 import net.runelite.rlawt.AWTContext;
 import org.lwjgl.opengl.GL;
 import static org.lwjgl.opengl.GL33C.*;
@@ -133,6 +134,9 @@ public class GpuPlugin extends Plugin implements DrawCallbacks
 	@Inject
 	private RenderCallbackManager renderCallbackManager;
 
+	@Inject
+	private NativeOverlayBuffer nativeOverlayBuffer;
+
 	private Canvas canvas;
 	private AWTContext awtContext;
 	private Callback debugCallback;
@@ -148,11 +152,19 @@ public class GpuPlugin extends Plugin implements DrawCallbacks
 		.add(GL_VERTEX_SHADER, "vertui.glsl")
 		.add(GL_FRAGMENT_SHADER, "fragui.glsl");
 
+	static final Shader OVERLAY_PROGRAM = new Shader()
+		.add(GL_VERTEX_SHADER, "vertoverlay.glsl")
+		.add(GL_FRAGMENT_SHADER, "fragoverlay.glsl");
+
 	static int glProgram;
 	private int glUiProgram;
+	private int glOverlayProgram;
 
 	private int interfaceTexture;
 	private int interfacePbo;
+	private int overlayTexture;
+	private int lastOverlayWidth = -1;
+	private int lastOverlayHeight = -1;
 
 	private int vaoUiHandle;
 	private int vboUiHandle;
@@ -265,6 +277,7 @@ public class GpuPlugin extends Plugin implements DrawCallbacks
 	private int uniTexSourceDimensions;
 	private int uniTexTargetDimensions;
 	private int uniUiAlphaOverlay;
+	private int uniOverlayTex;
 	private int uniTextures;
 	private int uniTextureAnimations;
 	private int uniBlockMain;
@@ -618,6 +631,7 @@ public class GpuPlugin extends Plugin implements DrawCallbacks
 		Template template = createTemplate();
 		glProgram = PROGRAM.compile(template);
 		glUiProgram = UI_PROGRAM.compile(template);
+		glOverlayProgram = OVERLAY_PROGRAM.compile(template);
 
 		glBindVertexArray(0);
 
@@ -649,6 +663,8 @@ public class GpuPlugin extends Plugin implements DrawCallbacks
 		uniTexSourceDimensions = glGetUniformLocation(glUiProgram, "sourceDimensions");
 		uniUiAlphaOverlay = glGetUniformLocation(glUiProgram, "alphaOverlay");
 		uniUiColorblindIntensity = glGetUniformLocation(glUiProgram, "colorblindIntensity");
+
+		uniOverlayTex = glGetUniformLocation(glOverlayProgram, "tex");
 	}
 
 	private void shutdownProgram()
@@ -658,6 +674,9 @@ public class GpuPlugin extends Plugin implements DrawCallbacks
 
 		glDeleteProgram(glUiProgram);
 		glUiProgram = 0;
+
+		glDeleteProgram(glOverlayProgram);
+		glOverlayProgram = 0;
 	}
 
 	private void initVao()
@@ -762,6 +781,14 @@ public class GpuPlugin extends Plugin implements DrawCallbacks
 		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
 		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
 		glBindTexture(GL_TEXTURE_2D, 0);
+
+		overlayTexture = glGenTextures();
+		glBindTexture(GL_TEXTURE_2D, overlayTexture);
+		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+		glBindTexture(GL_TEXTURE_2D, 0);
 	}
 
 	private void shutdownInterfaceTexture()
@@ -769,6 +796,12 @@ public class GpuPlugin extends Plugin implements DrawCallbacks
 		glDeleteBuffers(interfacePbo);
 		glDeleteTextures(interfaceTexture);
 		interfaceTexture = -1;
+		if (overlayTexture != 0)
+		{
+			glDeleteTextures(overlayTexture);
+			overlayTexture = 0;
+		}
+		lastOverlayWidth = lastOverlayHeight = -1;
 	}
 
 	private void initFbo(int width, int height, int aaSamples)
@@ -1506,6 +1539,7 @@ public class GpuPlugin extends Plugin implements DrawCallbacks
 
 		// Texture on UI
 		drawUi(overlayColor, canvasHeight, canvasWidth);
+		drawNativeOverlays();
 
 		try
 		{
@@ -1590,6 +1624,68 @@ public class GpuPlugin extends Plugin implements DrawCallbacks
 		glDrawArrays(GL_TRIANGLE_FAN, 0, 4);
 
 		// Reset
+		glBindTexture(GL_TEXTURE_2D, 0);
+		glBindVertexArray(0);
+		glUseProgram(0);
+		glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+		glDisable(GL_BLEND);
+	}
+
+	/**
+	 * Composite the native-resolution overlay buffer on top of the stretched UI.
+	 */
+	private void drawNativeOverlays()
+	{
+		if (!nativeOverlayBuffer.isActive())
+		{
+			return;
+		}
+
+		BufferedImage overlayImage = nativeOverlayBuffer.getImage();
+		int[] pixels = nativeOverlayBuffer.getPixels();
+		if (overlayImage == null || pixels == null)
+		{
+			return;
+		}
+
+		final int width = overlayImage.getWidth();
+		final int height = overlayImage.getHeight();
+
+		glEnable(GL_BLEND);
+		// Overlay buffer uses straight (non-premultiplied) alpha from AWT
+		glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+		glBindTexture(GL_TEXTURE_2D, overlayTexture);
+
+		if (lastOverlayWidth != width || lastOverlayHeight != height)
+		{
+			glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, width, height, 0, GL_BGRA, GL_UNSIGNED_INT_8_8_8_8_REV, pixels);
+			lastOverlayWidth = width;
+			lastOverlayHeight = height;
+		}
+		else
+		{
+			glTexSubImage2D(GL_TEXTURE_2D, 0, 0, 0, width, height, GL_BGRA, GL_UNSIGNED_INT_8_8_8_8_REV, pixels);
+		}
+
+		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+
+		glUseProgram(glOverlayProgram);
+		glUniform1i(uniOverlayTex, 0);
+
+		if (client.isStretchedEnabled())
+		{
+			Dimension dim = client.getStretchedDimensions();
+			glDpiAwareViewport(0, 0, dim.width, dim.height);
+		}
+		else
+		{
+			glDpiAwareViewport(0, 0, width, height);
+		}
+
+		glBindVertexArray(vaoUiHandle);
+		glDrawArrays(GL_TRIANGLE_FAN, 0, 4);
+
 		glBindTexture(GL_TEXTURE_2D, 0);
 		glBindVertexArray(0);
 		glUseProgram(0);

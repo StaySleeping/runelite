@@ -53,6 +53,7 @@ import net.runelite.api.TileObject;
 import net.runelite.api.WallObject;
 import net.runelite.api.WorldView;
 import net.runelite.api.coords.LocalPoint;
+import net.runelite.client.ui.overlay.NativeOverlayBuffer;
 
 @Singleton
 public class ModelOutlineRenderer
@@ -78,6 +79,7 @@ public class ModelOutlineRenderer
 	private static final int DIRECT_WRITE_OUTLINE_WIDTH_THRESHOLD = 10;
 
 	private final Client client;
+	private final NativeOverlayBuffer nativeOverlayBuffer;
 
 	// Vertex positions projected on the screen.
 	private final int[] projectedVerticesX = new int[6500];
@@ -96,6 +98,10 @@ public class ModelOutlineRenderer
 	private int croppedY2;
 	private int croppedWidth;
 	private int croppedHeight;
+
+	private boolean nativePass;
+	private double scaleX = 1;
+	private double scaleY = 1;
 
 	// Bitset with pixel positions that would be rendered to within the cropped area by the model.
 	private int[] visited = new int[0];
@@ -119,9 +125,10 @@ public class ModelOutlineRenderer
 	private PixelDistanceDelta[][][] precomputedDistanceDeltas = new PixelDistanceDelta[0][][];
 
 	@Inject
-	private ModelOutlineRenderer(Client client)
+	private ModelOutlineRenderer(Client client, NativeOverlayBuffer nativeOverlayBuffer)
 	{
 		this.client = client;
+		this.nativeOverlayBuffer = nativeOverlayBuffer;
 	}
 
 	/**
@@ -541,6 +548,14 @@ public class ModelOutlineRenderer
 
 			if (y != Integer.MIN_VALUE)
 			{
+				if (nativePass)
+				{
+					x = (int) Math.round(x * scaleX);
+					y = (int) Math.round(y * scaleY);
+					projectedVerticesX[i] = x;
+					projectedVerticesY[i] = y;
+				}
+
 				boolean visibleX = x >= clipX1 && x < clipX2;
 				boolean visibleY = y >= clipY1 && y < clipY2;
 				anyVisible |= visibleX && visibleY;
@@ -631,10 +646,31 @@ public class ModelOutlineRenderer
 	 * @param color The color to draw if directWrite == true
 	 * @param outlineWidth The outline width to draw if directWrite == true
 	 */
+	private BufferedImage getOutlineImage()
+	{
+		if (nativePass)
+		{
+			return nativeOverlayBuffer.getImage();
+		}
+		MainBufferProvider bufferProvider = (MainBufferProvider) client.getBufferProvider();
+		return (BufferedImage) bufferProvider.getImage();
+	}
+
+	/**
+	 * Enqueues pixels that are adjacent above or below the model
+	 * or draws them directly to the clients image buffer.
+	 *
+	 * @param directWrite If true the pixels are drawn to the image buffer, otherwise they are enqueued for drawing.
+	 * @param color The color to draw if directWrite == true
+	 * @param outlineWidth The outline width to draw if directWrite == true
+	 */
 	private void processInitialOutlinePixels(boolean directWrite, Color color, int outlineWidth)
 	{
-		MainBufferProvider bufferProvider = (MainBufferProvider) client.getBufferProvider();
-		BufferedImage image = (BufferedImage) bufferProvider.getImage();
+		BufferedImage image = getOutlineImage();
+		if (image == null)
+		{
+			return;
+		}
 		int imageWidth = image.getWidth();
 		int[] imageData = ((DataBufferInt) image.getRaster().getDataBuffer()).getData();
 		int colorRGB = color.getRGB();
@@ -813,8 +849,11 @@ public class ModelOutlineRenderer
 	 */
 	private void processOutlinePixelQueue(int outlineWidth, Color color, int feather)
 	{
-		MainBufferProvider bufferProvider = (MainBufferProvider) client.getBufferProvider();
-		BufferedImage image = (BufferedImage) bufferProvider.getImage();
+		BufferedImage image = getOutlineImage();
+		if (image == null)
+		{
+			return;
+		}
 		int imageWidth = image.getWidth();
 		int[] imageData = ((DataBufferInt) image.getRaster().getDataBuffer()).getData();
 		PixelDistanceGroupIndex[] ps = getPriorityList(outlineWidth, feather);
@@ -923,10 +962,23 @@ public class ModelOutlineRenderer
 		croppedY1 = Integer.MAX_VALUE;
 		croppedY2 = Integer.MIN_VALUE;
 
-		clipX1 = client.getViewportXOffset();
-		clipY1 = client.getViewportYOffset();
-		clipX2 = client.getViewportWidth() + clipX1;
-		clipY2 = client.getViewportHeight() + clipY1;
+		nativePass = nativeOverlayBuffer.isActive();
+		if (nativePass)
+		{
+			nativeOverlayBuffer.prepareFrame();
+			scaleX = nativeOverlayBuffer.getScaleX();
+			scaleY = nativeOverlayBuffer.getScaleY();
+		}
+		else
+		{
+			scaleX = 1;
+			scaleY = 1;
+		}
+
+		clipX1 = (int) Math.floor(client.getViewportXOffset() * scaleX);
+		clipY1 = (int) Math.floor(client.getViewportYOffset() * scaleY);
+		clipX2 = (int) Math.ceil((client.getViewportWidth() + client.getViewportXOffset()) * scaleX);
+		clipY2 = (int) Math.ceil((client.getViewportHeight() + client.getViewportYOffset()) * scaleY);
 
 		if (!projectVertices(wv, model, localX, localY, localZ, orientation))
 		{
