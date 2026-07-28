@@ -172,7 +172,9 @@ class MouseHighlightOverlay extends Overlay
 			return null;
 		}
 
-		tooltipManager.addFront(new Tooltip(option + (Strings.isNullOrEmpty(target) ? "" : " " + target)));
+		final Tooltip tooltip = new Tooltip(option + (Strings.isNullOrEmpty(target) ? "" : " " + target));
+		tooltip.setScaleWithOverlays(config.scaleTooltips());
+		tooltipManager.addFront(tooltip);
 		return null;
 	}
 }

@@ -63,4 +63,15 @@ public interface MouseHighlightConfig extends Config
 	{
 		return false;
 	}
+
+	@ConfigItem(
+		position = 3,
+		keyName = "scaleTooltips",
+		name = "Scale tooltips",
+		description = "When native resolution overlays is on, scale mouse tooltips with the overlay size mode and overlay scale."
+	)
+	default boolean scaleTooltips()
+	{
+		return true;
+	}
 }

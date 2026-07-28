@@ -32,6 +32,10 @@ public class Tooltip
 {
 	private String text;
 	private LayoutableRenderableEntity component;
+	/**
+	 * When true and native resolution overlays is active, draw at the interface overlay content scale.
+	 */
+	private boolean scaleWithOverlays;
 
 	public Tooltip(final String text)
 	{
