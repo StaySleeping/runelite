@@ -28,10 +28,12 @@ import java.awt.BasicStroke;
 import java.awt.Color;
 import java.awt.Dimension;
 import java.awt.Graphics2D;
+import java.awt.RenderingHints;
 import java.awt.Stroke;
 import java.awt.geom.Arc2D;
 import lombok.Setter;
 import net.runelite.api.Point;
+import net.runelite.client.ui.overlay.OverlayUtil;
 import net.runelite.client.ui.overlay.RenderableEntity;
 
 @Setter
@@ -47,22 +49,45 @@ public class ProgressPieComponent implements RenderableEntity
 	@Override
 	public Dimension render(Graphics2D graphics)
 	{
-		//Construct the arc
+		// Under native overlays, apply size mode + overlay scale without affecting world polygons.
+		final double sizeFactor = OverlayUtil.getNativeVisualSizeFactor(graphics);
+		final int drawDiameter = Math.max(1, (int) Math.round(diameter * sizeFactor));
+		final int x = position.getX() - drawDiameter / 2;
+		final int y = position.getY() - drawDiameter / 2;
+
+		final Object oldAa = graphics.getRenderingHint(RenderingHints.KEY_ANTIALIASING);
+		graphics.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
+
 		Arc2D.Float arc = new Arc2D.Float(Arc2D.PIE);
 		arc.setAngleStart(90);
 		arc.setAngleExtent(progress * 360);
-		arc.setFrame(position.getX() - diameter / 2, position.getY() - diameter / 2, diameter, diameter);
+		arc.setFrame(x, y, drawDiameter, drawDiameter);
 
-		//Draw the inside of the arc
 		graphics.setColor(fill);
 		graphics.fill(arc);
 
-		//Draw the outlines of the arc
-		graphics.setStroke(stroke);
+		Stroke drawStroke = stroke;
+		if (sizeFactor != 1.0 && stroke instanceof BasicStroke)
+		{
+			BasicStroke basic = (BasicStroke) stroke;
+			drawStroke = new BasicStroke(
+				(float) (basic.getLineWidth() * sizeFactor),
+				basic.getEndCap(),
+				basic.getLineJoin(),
+				basic.getMiterLimit(),
+				basic.getDashArray(),
+				basic.getDashPhase());
+		}
+		graphics.setStroke(drawStroke);
 		graphics.setColor(borderColor);
-		graphics.drawOval(position.getX() - diameter / 2, position.getY() - diameter / 2, diameter, diameter);
+		graphics.drawOval(x, y, drawDiameter, drawDiameter);
 
-		return new Dimension(diameter, diameter);
+		if (oldAa != null)
+		{
+			graphics.setRenderingHint(RenderingHints.KEY_ANTIALIASING, oldAa);
+		}
+
+		return new Dimension(drawDiameter, drawDiameter);
 	}
 
 	public void setBorder(Color border, int size)

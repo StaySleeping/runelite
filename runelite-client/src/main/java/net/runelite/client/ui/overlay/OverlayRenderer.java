@@ -320,7 +320,7 @@ public class OverlayRenderer extends MouseAdapter
 					if (nativeGraphics == null)
 					{
 						nativeGraphics = target.createGraphics();
-						OverlayUtil.setGraphicProperties(nativeGraphics);
+						OverlayUtil.setNativeOverlayProperties(nativeGraphics, nativeOverlayBuffer.getVisualSizeFactorX());
 						double sx = nativeOverlayBuffer.getScaleX();
 						double sy = nativeOverlayBuffer.getScaleY();
 						nativeGraphics.scale(sx, sy);
@@ -938,7 +938,7 @@ public class OverlayRenderer extends MouseAdapter
 			return null;
 		}
 		Graphics2D g = target.createGraphics();
-		OverlayUtil.setGraphicProperties(g);
+		OverlayUtil.setNativeOverlayProperties(g, nativeOverlayBuffer.getVisualSizeFactorX());
 		g.scale(nativeOverlayBuffer.getScaleX(), nativeOverlayBuffer.getScaleY());
 		return g;
 	}

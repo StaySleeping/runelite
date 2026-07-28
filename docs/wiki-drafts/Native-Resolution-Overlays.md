@@ -83,6 +83,10 @@ Use `OverlayUtil`:
 | `getImageLayoutSize(Graphics2D, BufferedImage)` | Layout size in canvas space after inverse-scale |
 | `renderImageLocationExact(Graphics2D, Point, BufferedImage)` | Point is top-left of the **drawn** (layout-sized) sprite — use when packing icons next to text |
 
+### Progress pies / timer pies
+
+`ProgressPieComponent` follows **Overlay size mode** and **Overlay scale** under native overlays (Canvas = unstretched visual size, Match UI = stretched size). Arcs are always antialiased into the native buffer, so Match UI pies stay smooth instead of looking like upscaled low-res circles.
+
 ### Icon + text packs
 
 Wrong (reserves full bitmap width while the sprite draws smaller → gap / off-centre group):

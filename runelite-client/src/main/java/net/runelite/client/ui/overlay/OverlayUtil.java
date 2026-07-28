@@ -47,6 +47,20 @@ public class OverlayUtil
 {
 	private static final int MINIMAP_DOT_RADIUS = 4;
 
+	/**
+	 * Canvas-space scale for DYNAMIC decorations (e.g. progress pies) under native overlays.
+	 * Matches {@link net.runelite.client.ui.overlay.NativeOverlayBuffer#getVisualSizeFactorX()}:
+	 * Canvas size mode cancels stretch; Match UI keeps stretch; both multiply by overlay scale %.
+	 */
+	public static final RenderingHints.Key KEY_NATIVE_VISUAL_SIZE_FACTOR = new RenderingHints.Key(0x4e4f5649)
+	{
+		@Override
+		public boolean isCompatibleValue(Object val)
+		{
+			return val instanceof Number;
+		}
+	};
+
 	public static void renderPolygon(Graphics2D graphics, Shape poly, Color color)
 	{
 		renderPolygon(graphics, poly, color, new BasicStroke(2));
@@ -266,5 +280,24 @@ public class OverlayUtil
 	public static void setGraphicProperties(Graphics2D graphics)
 	{
 		graphics.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
+	}
+
+	/**
+	 * Antialiasing plus size-mode/overlay-scale factor for the native overlay Graphics2D.
+	 */
+	public static void setNativeOverlayProperties(Graphics2D graphics, double visualSizeFactor)
+	{
+		setGraphicProperties(graphics);
+		graphics.setRenderingHint(KEY_NATIVE_VISUAL_SIZE_FACTOR, visualSizeFactor);
+	}
+
+	public static double getNativeVisualSizeFactor(Graphics2D graphics)
+	{
+		Object value = graphics.getRenderingHint(KEY_NATIVE_VISUAL_SIZE_FACTOR);
+		if (value instanceof Number)
+		{
+			return ((Number) value).doubleValue();
+		}
+		return 1.0;
 	}
 }
