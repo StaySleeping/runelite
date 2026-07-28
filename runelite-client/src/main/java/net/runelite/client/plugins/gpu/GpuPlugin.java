@@ -153,8 +153,8 @@ public class GpuPlugin extends Plugin implements DrawCallbacks
 		.add(GL_FRAGMENT_SHADER, "fragui.glsl");
 
 	static final Shader OVERLAY_PROGRAM = new Shader()
-		.add(GL_VERTEX_SHADER, "vertoverlay.glsl")
-		.add(GL_FRAGMENT_SHADER, "fragoverlay.glsl");
+		.add(GL_VERTEX_SHADER, "overlay.vert.glsl")
+		.add(GL_FRAGMENT_SHADER, "overlay.frag.glsl");
 
 	static int glProgram;
 	private int glUiProgram;
