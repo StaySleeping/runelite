@@ -37,6 +37,7 @@ import net.runelite.api.coords.LocalPoint;
 import net.runelite.client.ui.overlay.Overlay;
 import net.runelite.client.ui.overlay.OverlayLayer;
 import net.runelite.client.ui.overlay.OverlayPosition;
+import net.runelite.client.ui.overlay.OverlayUtil;
 
 public class PohOverlay extends Overlay
 {
@@ -87,7 +88,7 @@ public class PohOverlay extends Overlay
 
 					if (minimapLoc != null)
 					{
-						graphics.drawImage(icon.getImage(), minimapLoc.getX(), minimapLoc.getY(), null);
+						OverlayUtil.renderImageLocation(graphics, minimapLoc, icon.getImage());
 					}
 				}
 			}

@@ -312,13 +312,14 @@ public class PuzzleSolverOverlay extends Overlay
 										continue;
 									}
 
+									Dimension arrowSize = OverlayUtil.getImageLayoutSize(graphics, arrow);
 									int x = puzzleBoxLocation.getX() + blankX * PUZZLE_TILE_SIZE
-											+ PUZZLE_TILE_SIZE / 2 - arrow.getWidth() / 2 - 1;
+											+ PUZZLE_TILE_SIZE / 2 - arrowSize.width / 2 - 1;
 
 									int y = puzzleBoxLocation.getY() + blankY * PUZZLE_TILE_SIZE
-											+ PUZZLE_TILE_SIZE / 2 - arrow.getHeight() / 2 - 1;
+											+ PUZZLE_TILE_SIZE / 2 - arrowSize.height / 2 - 1;
 
-									OverlayUtil.renderImageLocation(graphics, new net.runelite.api.Point(x, y), arrow);
+									OverlayUtil.renderImageLocationExact(graphics, new net.runelite.api.Point(x, y), arrow);
 
 									lastBlankX = blankX;
 									lastBlankY = blankY;
