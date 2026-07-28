@@ -32,6 +32,7 @@ import java.awt.Polygon;
 import java.awt.RenderingHints;
 import java.awt.Shape;
 import java.awt.Stroke;
+import java.awt.geom.AffineTransform;
 import java.awt.image.BufferedImage;
 import net.runelite.api.Actor;
 import net.runelite.api.Client;
@@ -116,7 +117,23 @@ public class OverlayUtil
 		int x = imgLoc.getX();
 		int y = imgLoc.getY();
 
-		graphics.drawImage(image, x, y, null);
+		// Under native overlays the Graphics2D has stretch scale applied for canvas-space
+		// positioning. Inverse-scale the sprite so it matches DYNAMIC text (which uses an
+		// inverse-scaled font) instead of appearing at the old stretched size.
+		AffineTransform transform = graphics.getTransform();
+		double sx = transform.getScaleX();
+		double sy = transform.getScaleY();
+		if (sx != 1.0 || sy != 1.0)
+		{
+			graphics.translate(x, y);
+			graphics.scale(1.0 / sx, 1.0 / sy);
+			graphics.drawImage(image, 0, 0, null);
+			graphics.setTransform(transform);
+		}
+		else
+		{
+			graphics.drawImage(image, x, y, null);
+		}
 	}
 
 	public static void renderActorOverlay(Graphics2D graphics, Actor actor, String text, Color color)
