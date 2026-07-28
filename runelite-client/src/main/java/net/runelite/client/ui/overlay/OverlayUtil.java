@@ -48,6 +48,13 @@ public class OverlayUtil
 	private static final int MINIMAP_DOT_RADIUS = 4;
 
 	/**
+	 * Whether the overlay currently being rendered prefers the native buffer.
+	 * Used by shared helpers (e.g. {@code ModelOutlineRenderer}) that draw outside the
+	 * overlay's {@link Graphics2D} but should still honour hub opt-in.
+	 */
+	private static final ThreadLocal<Boolean> CURRENT_OVERLAY_NATIVE = ThreadLocal.withInitial(() -> false);
+
+	/**
 	 * Canvas-space scale for DYNAMIC decorations (e.g. progress pies) under native overlays.
 	 * Matches {@link net.runelite.client.ui.overlay.NativeOverlayBuffer#getVisualSizeFactorX()}:
 	 * Canvas size mode cancels stretch; Match UI keeps stretch; both multiply by overlay scale %.
@@ -299,5 +306,20 @@ public class OverlayUtil
 			return ((Number) value).doubleValue();
 		}
 		return 1.0;
+	}
+
+	/**
+	 * @return previous value
+	 */
+	public static boolean setCurrentOverlayNative(boolean nativePass)
+	{
+		boolean previous = CURRENT_OVERLAY_NATIVE.get();
+		CURRENT_OVERLAY_NATIVE.set(nativePass);
+		return previous;
+	}
+
+	public static boolean isCurrentOverlayNative()
+	{
+		return CURRENT_OVERLAY_NATIVE.get();
 	}
 }

@@ -381,7 +381,15 @@ public class OverlayRenderer extends MouseAdapter
 				Rectangle visualSize = getVisualSize(overlay, bounds.width, bounds.height);
 				clampOverlayLocation(location.x, location.y, visualSize.width, visualSize.height, overlay.getParentBounds(), location);
 
-				safeRender(overlay, drawGraphics, location, overlayNative, scaleX, scaleY);
+				boolean previousNative = OverlayUtil.setCurrentOverlayNative(overlayNative);
+				try
+				{
+					safeRender(overlay, drawGraphics, location, overlayNative, scaleX, scaleY);
+				}
+				finally
+				{
+					OverlayUtil.setCurrentOverlayNative(previousNative);
+				}
 
 				// Adjust snap corner based on where the overlay was drawn (visual bounds)
 				if (snapCorner != null && bounds.width + bounds.height > 0)

@@ -46,11 +46,13 @@ Even when drawing into the native buffer, **coordinates stay in canvas space** (
 
 ## Plugin Hub / sideloaded plugins (opt-in)
 
-Hub and sideloaded overlays **default to the legacy canvas path** when native overlays is on. They keep correct proportions (but stay soft when stretched) until they opt in.
+Hub and sideloaded **world** overlays (tiles, outlines, custom `DYNAMIC` drawing) **default to the legacy canvas path** when native overlays is on. They keep correct proportions (but stay soft when stretched) until they opt in.
+
+**Infoboxes are already included.** Hub plugins that register `InfoBox`es via `InfoBoxManager` are drawn by the core `InfoBoxOverlay`, which always follows native resolution + size mode / overlay scale. No hub opt-in is required for infoboxes.
 
 Builtin (core) overlays default to the native path.
 
-### Opting in
+### Opting in (tiles, outlines, custom overlays)
 
 Pass your `Plugin` into `Overlay`’s constructor (normal Hub practice), then:
 
@@ -58,7 +60,9 @@ Pass your `Plugin` into `Overlay`’s constructor (normal Hub practice), then:
 setPreferNativeResolution(true);
 ```
 
-Only do this after you have verified drawing under stretch + native overlays (see checklist below).
+Only do this after you have verified drawing under stretch + native overlays (see checklist below). Prefer submitting a PR to the hub plugin after testing with the author when possible.
+
+`ModelOutlineRenderer` follows the **calling overlay’s** preference: hub overlays that have not opted in keep soft outlines; after opt-in, outlines go native with that overlay.
 
 Detection: overlays whose plugin classloader is not the client classloader get `preferNativeResolution = false` automatically in `Overlay(Plugin)`.
 

@@ -315,7 +315,7 @@ public interface RuneLiteConfig extends Config
 	@ConfigItem(
 		keyName = "nativeResolutionOverlays",
 		name = "Native resolution overlays",
-		description = "When stretched mode is enabled, draw RuneLite overlays at display resolution instead of upscaling them with the game UI. World overlays (tiles, NPC highlights) become sharper. Overlay layers still respect under/above interface ordering (e.g. bank covers under-widget overlays). Plugin Hub overlays stay on the legacy path unless they opt in.",
+		description = "When stretched mode is enabled, draw RuneLite overlays at display resolution instead of upscaling them with the game UI. World overlays (tiles, NPC highlights) become sharper. Overlay layers still respect under/above interface ordering (e.g. bank covers under-widget overlays). Infoboxes always follow this setting. Other Plugin Hub overlays stay on the legacy path until they opt in.",
 		position = 28,
 		section = overlaySettings
 	)

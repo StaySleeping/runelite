@@ -54,6 +54,7 @@ import net.runelite.api.WallObject;
 import net.runelite.api.WorldView;
 import net.runelite.api.coords.LocalPoint;
 import net.runelite.client.ui.overlay.NativeOverlayBuffer;
+import net.runelite.client.ui.overlay.OverlayUtil;
 
 @Singleton
 public class ModelOutlineRenderer
@@ -962,7 +963,7 @@ public class ModelOutlineRenderer
 		croppedY1 = Integer.MAX_VALUE;
 		croppedY2 = Integer.MIN_VALUE;
 
-		nativePass = nativeOverlayBuffer.isActive() && client.isGpu();
+		nativePass = nativeOverlayBuffer.isActive() && client.isGpu() && OverlayUtil.isCurrentOverlayNative();
 		if (nativePass)
 		{
 			nativeOverlayBuffer.prepareFrame();
