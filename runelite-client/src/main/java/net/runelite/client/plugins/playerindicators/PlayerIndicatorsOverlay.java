@@ -121,7 +121,9 @@ public class PlayerIndicatorsOverlay extends Overlay
 
 		if (rankImage != null)
 		{
-			final int imageWidth = rankImage.getWidth();
+			final Dimension imageSize = OverlayUtil.getImageLayoutSize(graphics, rankImage);
+			final int imageWidth = imageSize.width;
+			final int imageHeight = imageSize.height;
 			final int imageTextMargin;
 			final int imageNegativeMargin;
 
@@ -137,8 +139,8 @@ public class PlayerIndicatorsOverlay extends Overlay
 			}
 
 			final int textHeight = graphics.getFontMetrics().getHeight() - graphics.getFontMetrics().getMaxDescent();
-			final Point imageLocation = new Point(textLocation.getX() - imageNegativeMargin - 1, textLocation.getY() - textHeight / 2 - rankImage.getHeight() / 2);
-			OverlayUtil.renderImageLocation(graphics, imageLocation, rankImage);
+			final Point imageLocation = new Point(textLocation.getX() - imageNegativeMargin - 1, textLocation.getY() - textHeight / 2 - imageHeight / 2);
+			OverlayUtil.renderImageLocationExact(graphics, imageLocation, rankImage);
 
 			// move text
 			textLocation = new Point(textLocation.getX() + imageTextMargin, textLocation.getY());

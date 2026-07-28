@@ -27,6 +27,7 @@ package net.runelite.client.ui.overlay;
 import com.google.common.base.Strings;
 import java.awt.BasicStroke;
 import java.awt.Color;
+import java.awt.Dimension;
 import java.awt.Graphics2D;
 import java.awt.Polygon;
 import java.awt.RenderingHints;
@@ -112,14 +113,59 @@ public class OverlayUtil
 		}
 	}
 
+	/**
+	 * Canvas-space width/height the image occupies after native stretch inverse-scale.
+	 * Use this for layout next to text instead of {@link BufferedImage#getWidth()}/{@link BufferedImage#getHeight()}.
+	 */
+	public static Dimension getImageLayoutSize(Graphics2D graphics, BufferedImage image)
+	{
+		AffineTransform transform = graphics.getTransform();
+		double sx = Math.abs(transform.getScaleX());
+		double sy = Math.abs(transform.getScaleY());
+		if (sx == 0)
+		{
+			sx = 1;
+		}
+		if (sy == 0)
+		{
+			sy = 1;
+		}
+		if (sx == 1.0 && sy == 1.0)
+		{
+			return new Dimension(image.getWidth(), image.getHeight());
+		}
+		return new Dimension(
+			Math.max(1, (int) Math.round(image.getWidth() / sx)),
+			Math.max(1, (int) Math.round(image.getHeight() / sy)));
+	}
+
+	/**
+	 * Renders an image at a canvas location. {@code imgLoc} is the top-left of the full bitmap
+	 * footprint (as returned by {@link Perspective#getCanvasImageLocation} / actor canvas image
+	 * helpers). When the graphics transform is stretch-scaled, the sprite is inverse-scaled and
+	 * centered in that footprint so world icons keep their anchor.
+	 */
 	public static void renderImageLocation(Graphics2D graphics, Point imgLoc, BufferedImage image)
 	{
-		int x = imgLoc.getX();
-		int y = imgLoc.getY();
+		Dimension layout = getImageLayoutSize(graphics, image);
+		int x = imgLoc.getX() + (image.getWidth() - layout.width) / 2;
+		int y = imgLoc.getY() + (image.getHeight() - layout.height) / 2;
+		renderImageLocationExact(graphics, x, y, image);
+	}
 
+	/**
+	 * Renders an image with {@code (x, y)} as the top-left of the drawn (layout-sized) sprite.
+	 * Use with {@link #getImageLayoutSize} when packing icons next to text.
+	 */
+	public static void renderImageLocationExact(Graphics2D graphics, Point imgLoc, BufferedImage image)
+	{
+		renderImageLocationExact(graphics, imgLoc.getX(), imgLoc.getY(), image);
+	}
+
+	private static void renderImageLocationExact(Graphics2D graphics, int x, int y, BufferedImage image)
+	{
 		// Under native overlays the Graphics2D has stretch scale applied for canvas-space
-		// positioning. Inverse-scale the sprite so it matches DYNAMIC text (which uses an
-		// inverse-scaled font) instead of appearing at the old stretched size.
+		// positioning. Inverse-scale the sprite so it matches DYNAMIC text (inverse-scaled font).
 		AffineTransform transform = graphics.getTransform();
 		double sx = transform.getScaleX();
 		double sy = transform.getScaleY();
