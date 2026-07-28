@@ -313,6 +313,32 @@ public interface RuneLiteConfig extends Config
 	}
 
 	@ConfigItem(
+		keyName = "nativeResolutionOverlays",
+		name = "Native resolution overlays",
+		description = "When stretched mode is enabled, draw RuneLite overlays at display resolution instead of upscaling them with the game UI. World overlays (tiles, NPC highlights) become sharper. Overlays are drawn above the game UI.",
+		position = 28,
+		section = overlaySettings
+	)
+	default boolean nativeResolutionOverlays()
+	{
+		return false;
+	}
+
+	@ConfigItem(
+		keyName = "overlayScale",
+		name = "Overlay scale",
+		description = "Scale of interface overlays (infoboxes, panels) when native resolution overlays is on. 100% matches stretched UI size; 50% is about half (roughly unstretched at 2× integer scaling). Does not affect world overlays.",
+		position = 29,
+		section = overlaySettings
+	)
+	@Units(Units.PERCENT)
+	@Range(min = 25, max = 200)
+	default int overlayScale()
+	{
+		return 100;
+	}
+
+	@ConfigItem(
 		keyName = "fontType",
 		name = "Dynamic overlay font",
 		description = "Configures what font is used for in-game overlays such as player name, ground items, etc.",
