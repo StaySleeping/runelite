@@ -551,14 +551,6 @@ public class ModelOutlineRenderer
 
 			if (y != Integer.MIN_VALUE)
 			{
-				if (nativePass)
-				{
-					x = (int) Math.round(x * scaleX);
-					y = (int) Math.round(y * scaleY);
-					projectedVerticesX[i] = x;
-					projectedVerticesY[i] = y;
-				}
-
 				boolean visibleX = x >= clipX1 && x < clipX2;
 				boolean visibleY = y >= clipY1 && y < clipY2;
 				anyVisible |= visibleX && visibleY;
@@ -616,16 +608,121 @@ public class ModelOutlineRenderer
 	}
 
 	/**
+	 * Writes an opaque/replace outline sample at canvas-space (x, y). Under native
+	 * overlays this fills the corresponding stretch-scale pixel block so the outline
+	 * lines up with the scene without running silhouette math at display resolution.
+	 */
+	private void writeOutlinePixel(int[] imageData, int imageWidth, int imageHeight, int x, int y, int color)
+	{
+		if (!nativePass || (scaleX == 1.0 && scaleY == 1.0))
+		{
+			if (x >= 0 && y >= 0 && x < imageWidth && y < imageHeight)
+			{
+				imageData[y * imageWidth + x] = color;
+			}
+			return;
+		}
+
+		int x0 = (int) Math.round(x * scaleX);
+		int y0 = (int) Math.round(y * scaleY);
+		int x1 = Math.max(x0 + 1, (int) Math.round((x + 1) * scaleX));
+		int y1 = Math.max(y0 + 1, (int) Math.round((y + 1) * scaleY));
+
+		for (int py = y0; py < y1; py++)
+		{
+			if (py < 0 || py >= imageHeight)
+			{
+				continue;
+			}
+			int row = py * imageWidth;
+			for (int px = x0; px < x1; px++)
+			{
+				if (px >= 0 && px < imageWidth)
+				{
+					imageData[row + px] = color;
+				}
+			}
+		}
+	}
+
+	private int readOutlinePixel(int[] imageData, int imageWidth, int imageHeight, int x, int y)
+	{
+		if (!nativePass || (scaleX == 1.0 && scaleY == 1.0))
+		{
+			if (x < 0 || y < 0 || x >= imageWidth || y >= imageHeight)
+			{
+				return 0;
+			}
+			return imageData[y * imageWidth + x];
+		}
+
+		int px = (int) Math.round(x * scaleX);
+		int py = (int) Math.round(y * scaleY);
+		if (px < 0 || py < 0 || px >= imageWidth || py >= imageHeight)
+		{
+			return 0;
+		}
+		return imageData[py * imageWidth + px];
+	}
+
+	private void blendOutlinePixel(int[] imageData, int imageWidth, int imageHeight, int x, int y, int colorARGB, int inverseAlpha)
+	{
+		int dst = readOutlinePixel(imageData, imageWidth, imageHeight, x, y);
+
+		if (!nativePass)
+		{
+			// MainBufferProvider / UI texture expects the historical premultiplied blend
+			int blended
+				= (colorARGB & 0xFF00FF00) + (((dst & 0xFF00FF00) * inverseAlpha) >>> 8) & 0xFF00FF00
+				| (colorARGB & 0x00FF00FF) + (((dst & 0x00FF00FF) * inverseAlpha) >>> 8) & 0x00FF00FF;
+			writeOutlinePixel(imageData, imageWidth, imageHeight, x, y, blended);
+			return;
+		}
+
+		// Native buffer stores straight alpha; GpuPlugin premultiplies on upload
+		int srcA = (colorARGB >>> 24) & 0xFF;
+		if (srcA == 0)
+		{
+			return;
+		}
+		int dstA = (dst >>> 24) & 0xFF;
+		if (dstA == 0)
+		{
+			writeOutlinePixel(imageData, imageWidth, imageHeight, x, y, colorARGB);
+			return;
+		}
+
+		int outA = srcA + dstA * inverseAlpha / 256;
+		if (outA == 0)
+		{
+			writeOutlinePixel(imageData, imageWidth, imageHeight, x, y, 0);
+			return;
+		}
+		int srcR = (colorARGB >>> 16) & 0xFF;
+		int srcG = (colorARGB >>> 8) & 0xFF;
+		int srcB = colorARGB & 0xFF;
+		int dstR = (dst >>> 16) & 0xFF;
+		int dstG = (dst >>> 8) & 0xFF;
+		int dstB = dst & 0xFF;
+		int outR = (srcR * srcA + dstR * dstA * inverseAlpha / 256) / outA;
+		int outG = (srcG * srcA + dstG * dstA * inverseAlpha / 256) / outA;
+		int outB = (srcB * srcA + dstB * dstA * inverseAlpha / 256) / outA;
+		writeOutlinePixel(imageData, imageWidth, imageHeight, x, y,
+			(Math.min(255, outA) << 24) | (Math.min(255, outR) << 16) | (Math.min(255, outG) << 8) | Math.min(255, outB));
+	}
+
+	/**
 	 * Draws the outline of a pixel according to the distance deltas of an outline.
 	 *
 	 * @param imageData The image data to draw to.
 	 * @param imageWidth The width of the image to draw to.
+	 * @param imageHeight The height of the image to draw to.
 	 * @param x The x position of the pixel.
 	 * @param y The y position of the pixel.
 	 * @param distanceDeltas The distance deltas of the outline width.
 	 * @param color The color to draw the outline in.
 	 */
-	private void rasterDistanceDeltas(int[] imageData, int imageWidth, int x, int y,
+	private void rasterDistanceDeltas(int[] imageData, int imageWidth, int imageHeight, int x, int y,
 		PixelDistanceDelta[] distanceDeltas, int color)
 	{
 		for (PixelDistanceDelta delta : distanceDeltas)
@@ -636,7 +733,7 @@ public class ModelOutlineRenderer
 			if (cx >= clipX1 && cx < clipX2 && cy >= clipY1 && cy < clipY2 &&
 				(visited[visitedPixelPos >> 5] & (1 << (visitedPixelPos & 31))) == 0)
 			{
-				imageData[cy * imageWidth + cx] = color;
+				writeOutlinePixel(imageData, imageWidth, imageHeight, cx, cy, color);
 			}
 		}
 	}
@@ -675,6 +772,7 @@ public class ModelOutlineRenderer
 			return;
 		}
 		int imageWidth = image.getWidth();
+		int imageHeight = image.getHeight();
 		int[] imageData = ((DataBufferInt) image.getRaster().getDataBuffer()).getData();
 		int colorRGB = color.getRGB();
 
@@ -699,7 +797,8 @@ public class ModelOutlineRenderer
 								int bv2 = (v2 >>> bit) & 1;
 								if (bv1 != bv2)
 								{
-									imageData[(croppedY1 + y - bv2) * imageWidth + (croppedX1 + x + bit)] = colorRGB;
+									writeOutlinePixel(imageData, imageWidth, imageHeight,
+										croppedX1 + x + bit, croppedY1 + y - bv2, colorRGB);
 								}
 							}
 						}
@@ -713,12 +812,12 @@ public class ModelOutlineRenderer
 								int bv2 = (v2 >>> bit) & 1;
 								if (bv1 == 1 && bv2 == 0)
 								{
-									rasterDistanceDeltas(imageData, imageWidth, croppedX1 + x + bit, croppedY1 + y - 1,
+									rasterDistanceDeltas(imageData, imageWidth, imageHeight, croppedX1 + x + bit, croppedY1 + y - 1,
 										distancesDown, colorRGB);
 								}
 								else if (bv1 == 0 && bv2 == 1)
 								{
-									rasterDistanceDeltas(imageData, imageWidth, croppedX1 + x + bit, croppedY1 + y,
+									rasterDistanceDeltas(imageData, imageWidth, imageHeight, croppedX1 + x + bit, croppedY1 + y,
 										distancesUp, colorRGB);
 								}
 							}
@@ -767,7 +866,8 @@ public class ModelOutlineRenderer
 								int bv = (v >>> bit) & 1;
 								if (bv != lastBv)
 								{
-									imageData[(croppedY1 + y) * imageWidth + (croppedX1 + x + bit - bv)] = colorRGB;
+									writeOutlinePixel(imageData, imageWidth, imageHeight,
+										croppedX1 + x + bit - bv, croppedY1 + y, colorRGB);
 								}
 								lastBv = bv;
 							}
@@ -781,12 +881,12 @@ public class ModelOutlineRenderer
 								int bv = (v >>> bit) & 1;
 								if (bv == 1 && lastBv == 0)
 								{
-									rasterDistanceDeltas(imageData, imageWidth, croppedX1 + x + bit, croppedY1 + y,
+									rasterDistanceDeltas(imageData, imageWidth, imageHeight, croppedX1 + x + bit, croppedY1 + y,
 										distancesLeft, colorRGB);
 								}
 								else if (bv == 0 && lastBv == 1)
 								{
-									rasterDistanceDeltas(imageData, imageWidth, croppedX1 + x + bit - 1, croppedY1 + y,
+									rasterDistanceDeltas(imageData, imageWidth, imageHeight, croppedX1 + x + bit - 1, croppedY1 + y,
 										distancesRight, colorRGB);
 								}
 								lastBv = bv;
@@ -814,20 +914,21 @@ public class ModelOutlineRenderer
 					{
 						if (outlineWidth == 1)
 						{
-							imageData[(croppedY1 + y) * imageWidth + (croppedX1 + x - (v & 1))] = colorRGB;
+							writeOutlinePixel(imageData, imageWidth, imageHeight,
+								croppedX1 + x - (v & 1), croppedY1 + y, colorRGB);
 						}
 						else
 						{
 							if ((v & 1) == 1)
 							{
 								PixelDistanceDelta[] distancesLeft = precomputedDistanceDeltas[outlineWidth][2];
-								rasterDistanceDeltas(imageData, imageWidth, croppedX1 + x, croppedY1 + y,
+								rasterDistanceDeltas(imageData, imageWidth, imageHeight, croppedX1 + x, croppedY1 + y,
 									distancesLeft, colorRGB);
 							}
 							else
 							{
 								PixelDistanceDelta[] distancesRight = precomputedDistanceDeltas[outlineWidth][0];
-								rasterDistanceDeltas(imageData, imageWidth, croppedX1 + x - 1, croppedY1 + y,
+								rasterDistanceDeltas(imageData, imageWidth, imageHeight, croppedX1 + x - 1, croppedY1 + y,
 									distancesRight, colorRGB);
 							}
 						}
@@ -858,6 +959,7 @@ public class ModelOutlineRenderer
 			return;
 		}
 		int imageWidth = image.getWidth();
+		int imageHeight = image.getHeight();
 		int[] imageData = ((DataBufferInt) image.getRaster().getDataBuffer()).getData();
 		PixelDistanceGroupIndex[] ps = getPriorityList(outlineWidth, feather);
 
@@ -870,10 +972,21 @@ public class ModelOutlineRenderer
 			{
 				int alpha = (int) Math.round(color.getAlpha() * p.alphaMultiply);
 				inverseAlpha = 256 - alpha;
-				colorARGB = (alpha << 24)
-					| ((color.getRed() * alpha) / 255) << 16
-					| ((color.getGreen() * alpha) / 255) << 8
-					| ((color.getBlue() * alpha) / 255);
+				if (nativePass)
+				{
+					// Straight alpha — native upload premultiplies for GL_ONE blending
+					colorARGB = (alpha << 24)
+						| (color.getRed() << 16)
+						| (color.getGreen() << 8)
+						| color.getBlue();
+				}
+				else
+				{
+					colorARGB = (alpha << 24)
+						| ((color.getRed() * alpha) / 255) << 16
+						| ((color.getGreen() * alpha) / 255) << 8
+						| ((color.getBlue() * alpha) / 255);
+				}
 			}
 
 			final int groupIndex = p.distanceGroupIndex;
@@ -896,11 +1009,7 @@ public class ModelOutlineRenderer
 					}
 					visited[visitedPixelPos >> 5] |= 1 << (visitedPixelPos & 31);
 
-					int pixelPos = y * imageWidth + x;
-					int dst = imageData[pixelPos];
-					imageData[pixelPos]
-						= (colorARGB & 0xFF00FF00) + (((dst & 0xFF00FF00) * inverseAlpha) >>> 8) & 0xFF00FF00
-						| (colorARGB & 0x00FF00FF) + (((dst & 0x00FF00FF) * inverseAlpha) >>> 8) & 0x00FF00FF;
+					blendOutlinePixel(imageData, imageWidth, imageHeight, x, y, colorARGB, inverseAlpha);
 
 					if (x - 1 >= clipX1)
 					{
@@ -978,10 +1087,12 @@ public class ModelOutlineRenderer
 			scaleY = 1;
 		}
 
-		clipX1 = (int) Math.floor(client.getViewportXOffset() * scaleX);
-		clipY1 = (int) Math.floor(client.getViewportYOffset() * scaleY);
-		clipX2 = (int) Math.ceil((client.getViewportWidth() + client.getViewportXOffset()) * scaleX);
-		clipY2 = (int) Math.ceil((client.getViewportHeight() + client.getViewportYOffset()) * scaleY);
+		// Rasterize in canvas space (same as modelToCanvas). Native stretch is applied
+		// only when writing pixels so fixed-point silhouette math stays valid.
+		clipX1 = client.getViewportXOffset();
+		clipY1 = client.getViewportYOffset();
+		clipX2 = client.getViewportWidth() + clipX1;
+		clipY2 = client.getViewportHeight() + clipY1;
 
 		if (!projectVertices(wv, model, localX, localY, localZ, orientation))
 		{
