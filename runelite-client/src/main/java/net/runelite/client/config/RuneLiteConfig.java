@@ -325,10 +325,22 @@ public interface RuneLiteConfig extends Config
 	}
 
 	@ConfigItem(
+		keyName = "overlaySizeMode",
+		name = "Overlay size mode",
+		description = "When native resolution overlays is on: Canvas keeps interface overlays the same size as without stretched mode; Match UI sizes them like the stretched game UI. Does not affect world overlays.",
+		position = 29,
+		section = overlaySettings
+	)
+	default OverlaySizeMode overlaySizeMode()
+	{
+		return OverlaySizeMode.CANVAS;
+	}
+
+	@ConfigItem(
 		keyName = "overlayScale",
 		name = "Overlay scale",
-		description = "Scale of interface overlays (infoboxes, panels) when native resolution overlays is on. 100% matches stretched UI size; 50% is about half (roughly unstretched at 2× integer scaling). Does not affect world overlays.",
-		position = 29,
+		description = "Extra scale for interface overlays when native resolution overlays is on. 100% is exactly the selected overlay size mode. Does not affect world overlays.",
+		position = 30,
 		section = overlaySettings
 	)
 	@Units(Units.PERCENT)
@@ -342,7 +354,7 @@ public interface RuneLiteConfig extends Config
 		keyName = "fontType",
 		name = "Dynamic overlay font",
 		description = "Configures what font is used for in-game overlays such as player name, ground items, etc.",
-		position = 30,
+		position = 31,
 		section = overlaySettings
 	)
 	default FontType dynamicOverlayFont()
@@ -354,7 +366,7 @@ public interface RuneLiteConfig extends Config
 		keyName = "tooltipFontType",
 		name = "Tooltip font",
 		description = "Configures what font is used for in-game tooltips such as food stats, NPC names, etc.",
-		position = 31,
+		position = 32,
 		section = overlaySettings
 	)
 	default FontType tooltipFont()
@@ -366,7 +378,7 @@ public interface RuneLiteConfig extends Config
 		keyName = "interfaceFontType",
 		name = "Interface font",
 		description = "Configures what font is used for in-game interface overlays such as panels, opponent info, clue scrolls etc.",
-		position = 32,
+		position = 33,
 		section = overlaySettings
 	)
 	default FontType interfaceFont()
@@ -378,7 +390,7 @@ public interface RuneLiteConfig extends Config
 		keyName = "infoboxFontType",
 		name = "Infobox font",
 		description = "Configures what font is used for infoboxes.",
-		position = 33,
+		position = 34,
 		section = overlaySettings
 	)
 	default FontType infoboxFont()

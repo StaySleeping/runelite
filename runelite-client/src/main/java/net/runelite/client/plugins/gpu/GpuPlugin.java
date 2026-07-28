@@ -1642,7 +1642,7 @@ public class GpuPlugin extends Plugin implements DrawCallbacks
 		}
 
 		BufferedImage overlayImage = nativeOverlayBuffer.getImage();
-		int[] pixels = nativeOverlayBuffer.getPixels();
+		int[] pixels = nativeOverlayBuffer.getPremultipliedPixels();
 		if (overlayImage == null || pixels == null)
 		{
 			return;
@@ -1652,8 +1652,8 @@ public class GpuPlugin extends Plugin implements DrawCallbacks
 		final int height = overlayImage.getHeight();
 
 		glEnable(GL_BLEND);
-		// Overlay buffer uses straight (non-premultiplied) alpha from AWT
-		glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+		// Premultiplied ARGB from getPremultipliedPixels()
+		glBlendFunc(GL_ONE, GL_ONE_MINUS_SRC_ALPHA);
 		glBindTexture(GL_TEXTURE_2D, overlayTexture);
 
 		if (lastOverlayWidth != width || lastOverlayHeight != height)

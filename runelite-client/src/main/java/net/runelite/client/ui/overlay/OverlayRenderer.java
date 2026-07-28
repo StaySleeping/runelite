@@ -367,13 +367,14 @@ public class OverlayRenderer extends MouseAdapter
 				location.setLocation(bounds.x, bounds.y);
 			}
 
-			// Clamp the overlay position to ensure it is on screen or within parent bounds
-			clampOverlayLocation(location.x, location.y, bounds.width, bounds.height, overlay.getParentBounds(), location);
-
 			if (overlay.getPreferredSize() != null)
 			{
 				bounds.setSize(overlay.getPreferredSize());
 			}
+
+			// Clamp using visual size so scaled-down overlays can reach screen edges
+			Rectangle visualSize = getVisualSize(overlay, bounds.width, bounds.height);
+			clampOverlayLocation(location.x, location.y, visualSize.width, visualSize.height, overlay.getParentBounds(), location);
 
 			safeRender(overlay, graphics, location, nativePass, scaleX, scaleY);
 
@@ -438,29 +439,45 @@ public class OverlayRenderer extends MouseAdapter
 	}
 
 	/**
-	 * Visual hit-test bounds in canvas space, accounting for overlay scale on non-DYNAMIC overlays.
+	 * Visual hit-test bounds in canvas space, accounting for overlay size mode and scale.
 	 */
 	private Rectangle getHitBounds(Overlay overlay)
 	{
 		Rectangle bounds = overlay.getBounds();
-		if (!nativeOverlayBuffer.isActive())
+		Rectangle visual = getVisualSize(overlay, bounds.width, bounds.height);
+		if (visual.width == bounds.width && visual.height == bounds.height)
 		{
 			return bounds;
+		}
+		return new Rectangle(bounds.x, bounds.y, visual.width, visual.height);
+	}
+
+	/**
+	 * Canvas-space width/height after native overlay sizing (size mode + overlay scale).
+	 */
+	private Rectangle getVisualSize(Overlay overlay, int logicalWidth, int logicalHeight)
+	{
+		if (!nativeOverlayBuffer.isActive())
+		{
+			return new Rectangle(0, 0, logicalWidth, logicalHeight);
 		}
 
 		OverlayPosition position = getCorrectedOverlayPosition(overlay);
 		if (position == OverlayPosition.DYNAMIC || position == OverlayPosition.TOOLTIP)
 		{
-			return bounds;
+			return new Rectangle(0, 0, logicalWidth, logicalHeight);
 		}
 
-		double os = nativeOverlayBuffer.getOverlayScale();
-		if (os == 1.0)
+		double fx = nativeOverlayBuffer.getVisualSizeFactorX();
+		double fy = nativeOverlayBuffer.getVisualSizeFactorY();
+		if (fx == 1.0 && fy == 1.0)
 		{
-			return bounds;
+			return new Rectangle(0, 0, logicalWidth, logicalHeight);
 		}
 
-		return new Rectangle(bounds.x, bounds.y, (int) Math.round(bounds.width * os), (int) Math.round(bounds.height * os));
+		return new Rectangle(0, 0,
+			Math.max(0, (int) Math.round(logicalWidth * fx)),
+			Math.max(0, (int) Math.round(logicalHeight * fy)));
 	}
 
 	@Override
@@ -687,9 +704,10 @@ public class OverlayRenderer extends MouseAdapter
 			Point overlayPosition = new Point(p);
 			overlayPosition.translate(-overlayOffset.x, -overlayOffset.y); // adjust by mouse offset to get overlay position
 
-			// Clamp drag to parent component
+			// Clamp drag to parent component using visual size
 			final Rectangle overlayBounds = currentManagedOverlay.getBounds();
-			clampOverlayLocation(overlayPosition.x, overlayPosition.y, overlayBounds.width, overlayBounds.height, currentManagedOverlay.getParentBounds(), overlayPosition);
+			Rectangle visualSize = getVisualSize(currentManagedOverlay, overlayBounds.width, overlayBounds.height);
+			clampOverlayLocation(overlayPosition.x, overlayPosition.y, visualSize.width, visualSize.height, currentManagedOverlay.getParentBounds(), overlayPosition);
 
 			if (currentManagedOverlay.getOrigin() == OverlayOrigin.AUTO)
 			{
@@ -841,10 +859,11 @@ public class OverlayRenderer extends MouseAdapter
 
 		if (nativePass && position != OverlayPosition.DYNAMIC && position != OverlayPosition.TOOLTIP)
 		{
-			double os = nativeOverlayBuffer.getOverlayScale();
-			if (os != 1.0)
+			double cx = nativeOverlayBuffer.getPanelContentScaleX();
+			double cy = nativeOverlayBuffer.getPanelContentScaleY();
+			if (cx != 1.0 || cy != 1.0)
 			{
-				graphics.scale(os, os);
+				graphics.scale(cx, cy);
 			}
 		}
 

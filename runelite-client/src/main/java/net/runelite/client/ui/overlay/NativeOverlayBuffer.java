@@ -24,15 +24,16 @@
  */
 package net.runelite.client.ui.overlay;
 
-import java.awt.AlphaComposite;
 import java.awt.Dimension;
 import java.awt.Graphics2D;
 import java.awt.image.BufferedImage;
 import java.awt.image.DataBufferInt;
+import java.util.Arrays;
 import javax.inject.Inject;
 import javax.inject.Singleton;
 import lombok.Getter;
 import net.runelite.api.Client;
+import net.runelite.client.config.OverlaySizeMode;
 import net.runelite.client.config.RuneLiteConfig;
 
 /**
@@ -47,6 +48,7 @@ public class NativeOverlayBuffer
 
 	@Getter
 	private BufferedImage image;
+	private int[] premultipliedUpload;
 	private int frameId;
 	private int preparedFrameId = -1;
 
@@ -83,11 +85,66 @@ public class NativeOverlayBuffer
 	}
 
 	/**
-	 * Interface overlay scale factor (1.0 = match stretched UI size).
+	 * User overlay scale percent as a factor (1.0 = 100%).
 	 */
 	public double getOverlayScale()
 	{
 		return runeLiteConfig.overlayScale() / 100.0;
+	}
+
+	public OverlaySizeMode getOverlaySizeMode()
+	{
+		return runeLiteConfig.overlaySizeMode();
+	}
+
+	/**
+	 * Content scale applied after the outer stretch transform for interface overlays.
+	 * MATCH_UI: 1 (content scales with stretch). CANVAS: 1/stretch (cancel stretch on size).
+	 * Then multiplied by overlayScale percent.
+	 */
+	public double getPanelContentScaleX()
+	{
+		double os = getOverlayScale();
+		if (getOverlaySizeMode() == OverlaySizeMode.CANVAS)
+		{
+			double sx = getScaleX();
+			return os / (sx == 0 ? 1 : sx);
+		}
+		return os;
+	}
+
+	public double getPanelContentScaleY()
+	{
+		double os = getOverlayScale();
+		if (getOverlaySizeMode() == OverlaySizeMode.CANVAS)
+		{
+			double sy = getScaleY();
+			return os / (sy == 0 ? 1 : sy);
+		}
+		return os;
+	}
+
+	/**
+	 * Canvas-space factor from logical overlay size to visual hit/clamp size.
+	 */
+	public double getVisualSizeFactorX()
+	{
+		if (getOverlaySizeMode() == OverlaySizeMode.CANVAS)
+		{
+			double sx = getScaleX();
+			return getOverlayScale() / (sx == 0 ? 1 : sx);
+		}
+		return getOverlayScale();
+	}
+
+	public double getVisualSizeFactorY()
+	{
+		if (getOverlaySizeMode() == OverlaySizeMode.CANVAS)
+		{
+			double sy = getScaleY();
+			return getOverlayScale() / (sy == 0 ? 1 : sy);
+		}
+		return getOverlayScale();
 	}
 
 	/**
@@ -105,16 +162,14 @@ public class NativeOverlayBuffer
 		if (image == null || image.getWidth() != dim.width || image.getHeight() != dim.height)
 		{
 			image = new BufferedImage(dim.width, dim.height, BufferedImage.TYPE_INT_ARGB);
+			premultipliedUpload = null;
 			preparedFrameId = -1;
 		}
 
 		int currentFrame = frameId;
 		if (preparedFrameId != currentFrame)
 		{
-			Graphics2D g = image.createGraphics();
-			g.setComposite(AlphaComposite.Clear);
-			g.fillRect(0, 0, image.getWidth(), image.getHeight());
-			g.dispose();
+			Arrays.fill(getPixels(), 0);
 			preparedFrameId = currentFrame;
 		}
 	}
@@ -133,9 +188,50 @@ public class NativeOverlayBuffer
 		return ((DataBufferInt) image.getRaster().getDataBuffer()).getData();
 	}
 
+	/**
+	 * Returns a reusable buffer of premultiplied ARGB pixels for GL upload.
+	 */
+	public int[] getPremultipliedPixels()
+	{
+		int[] src = getPixels();
+		if (src == null)
+		{
+			return null;
+		}
+		if (premultipliedUpload == null || premultipliedUpload.length != src.length)
+		{
+			premultipliedUpload = new int[src.length];
+		}
+		for (int i = 0; i < src.length; i++)
+		{
+			int p = src[i];
+			int a = (p >>> 24) & 0xFF;
+			if (a == 0)
+			{
+				premultipliedUpload[i] = 0;
+			}
+			else if (a == 255)
+			{
+				premultipliedUpload[i] = p;
+			}
+			else
+			{
+				int r = (p >>> 16) & 0xFF;
+				int g = (p >>> 8) & 0xFF;
+				int b = p & 0xFF;
+				premultipliedUpload[i] = (a << 24)
+					| (((r * a + 127) / 255) << 16)
+					| (((g * a + 127) / 255) << 8)
+					| ((b * a + 127) / 255);
+			}
+		}
+		return premultipliedUpload;
+	}
+
 	public void release()
 	{
 		image = null;
+		premultipliedUpload = null;
 		preparedFrameId = -1;
 	}
 }
