@@ -56,7 +56,7 @@ public class OverlayUtil
 
 	/**
 	 * Canvas-space scale for DYNAMIC decorations (e.g. progress pies, images, text) under native overlays.
-	 * Matches {@link net.runelite.client.ui.overlay.NativeOverlayBuffer#getVisualSizeFactorX()}:
+	 * Matches {@link net.runelite.client.ui.overlay.NativeOverlayBuffer#getPanelContentScaleX()}:
 	 * fixed overlay size cancels stretch; otherwise stretch is kept.
 	 */
 	public static final RenderingHints.Key KEY_NATIVE_VISUAL_SIZE_FACTOR = new RenderingHints.Key(0x4e4f5649)

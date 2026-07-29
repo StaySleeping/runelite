@@ -45,13 +45,12 @@ import net.runelite.client.plugins.stretchedmode.StretchedModeConfig;
  * <p>
  * Inactive when stretched mode is off, or when stretch does not actually upscale
  * (stretched size equals canvas) — then the legacy single-buffer path is enough.
- * Clear / premultiply / upload are limited to dirty AABBs when possible.
+ * Each pass is fully cleared once per frame; compositors upload the full buffer
+ * when the pass was touched (or to push a clear after prior content).
  */
 @Singleton
 public class NativeOverlayBuffer
 {
-	private static final float FULL_UPLOAD_AREA_RATIO = 0.5f;
-
 	public enum Pass
 	{
 		/**
@@ -69,14 +68,12 @@ public class NativeOverlayBuffer
 
 	private BufferedImage underImage;
 	private BufferedImage aboveImage;
-	private int[] underPremultipliedUpload;
-	private int[] abovePremultipliedUpload;
 	private int[] uploadScratch;
 	private int frameId;
 	private int preparedFrameId = -1;
 
-	private final DirtyPass under = new DirtyPass();
-	private final DirtyPass above = new DirtyPass();
+	private final PassState under = new PassState();
+	private final PassState above = new PassState();
 
 	@Inject
 	private NativeOverlayBuffer(Client client, ConfigManager configManager)
@@ -145,6 +142,7 @@ public class NativeOverlayBuffer
 	/**
 	 * Content scale applied after the outer stretch transform for interface overlays.
 	 * Fixed size: 1/stretch (cancel stretch on size). Otherwise: 1 (scale with stretch).
+	 * Also used as the canvas-space visual size factor for DYNAMIC overlays.
 	 */
 	public double getPanelContentScaleX()
 	{
@@ -167,19 +165,6 @@ public class NativeOverlayBuffer
 	}
 
 	/**
-	 * Canvas-space factor from logical overlay size to visual hit/clamp size.
-	 */
-	public double getVisualSizeFactorX()
-	{
-		return getPanelContentScaleX();
-	}
-
-	public double getVisualSizeFactorY()
-	{
-		return getPanelContentScaleY();
-	}
-
-	/**
 	 * Ensures required buffers exist and are cleared once per client frame.
 	 * Under-UI is only allocated on GPU (CPU keeps under-UI overlays on the canvas).
 	 */
@@ -196,30 +181,15 @@ public class NativeOverlayBuffer
 
 		if (needUnder)
 		{
-			BufferedImage newUnder = ensureImage(underImage, dim);
-			if (newUnder != underImage)
-			{
-				underPremultipliedUpload = null;
-				preparedFrameId = -1;
-				under.reset();
-			}
-			underImage = newUnder;
+			underImage = ensureImage(underImage, dim);
 		}
 		else if (underImage != null)
 		{
 			underImage = null;
-			underPremultipliedUpload = null;
 			under.reset();
 		}
 
-		BufferedImage newAbove = ensureImage(aboveImage, dim);
-		if (newAbove != aboveImage)
-		{
-			abovePremultipliedUpload = null;
-			preparedFrameId = -1;
-			above.reset();
-		}
-		aboveImage = newAbove;
+		aboveImage = ensureImage(aboveImage, dim);
 
 		int currentFrame = frameId;
 		if (preparedFrameId != currentFrame)
@@ -232,7 +202,7 @@ public class NativeOverlayBuffer
 
 	private void beginFrame(Pass pass)
 	{
-		DirtyPass state = state(pass);
+		PassState state = state(pass);
 		BufferedImage image = getImage(pass);
 		if (image == null)
 		{
@@ -240,19 +210,10 @@ public class NativeOverlayBuffer
 			return;
 		}
 
-		// Clear last frame's drawn region in the CPU buffer (zeros for this frame / GL update).
-		if (state.previous != null)
-		{
-			clearRect(getPixels(pass), image.getWidth(), state.previous);
-			state.pendingZero = copyRect(state.previous);
-		}
-		else
-		{
-			state.pendingZero = null;
-		}
-		state.current = null;
-		state.dirty = false;
-		state.previous = null;
+		Arrays.fill(getPixels(pass), 0);
+		state.touched = false;
+		// hadContent from the previous finishComposite keeps isDirty true so the
+		// compositor uploads this cleared buffer once (avoids ghosted GL/CPU pixels).
 	}
 
 	private static BufferedImage ensureImage(BufferedImage image, Dimension dim)
@@ -270,125 +231,44 @@ public class NativeOverlayBuffer
 	}
 
 	/**
-	 * Marks the entire pass dirty (fallback when bounds are unknown).
+	 * Marks the pass as needing a full-buffer upload this frame.
 	 */
 	public void markDirty(Pass pass)
 	{
-		BufferedImage image = getImage(pass);
-		if (image == null)
+		if (getImage(pass) == null)
 		{
 			return;
 		}
-		markDirty(pass, 0, 0, image.getWidth(), image.getHeight());
-	}
-
-	/**
-	 * Marks a buffer-space rectangle dirty (unioned with any existing dirty region).
-	 */
-	public void markDirty(Pass pass, int x, int y, int w, int h)
-	{
-		BufferedImage image = getImage(pass);
-		if (image == null || w <= 0 || h <= 0)
-		{
-			return;
-		}
-
-		int imgW = image.getWidth();
-		int imgH = image.getHeight();
-		int x0 = Math.max(0, x);
-		int y0 = Math.max(0, y);
-		int x1 = Math.min(imgW, x + w);
-		int y1 = Math.min(imgH, y + h);
-		if (x0 >= x1 || y0 >= y1)
-		{
-			return;
-		}
-
-		DirtyPass state = state(pass);
-		Rectangle add = new Rectangle(x0, y0, x1 - x0, y1 - y0);
-		if (state.current == null)
-		{
-			state.current = add;
-		}
-		else
-		{
-			state.current = state.current.union(add);
-		}
-		state.dirty = true;
-	}
-
-	/**
-	 * Canvas-space dirty mark; converts to buffer pixels via stretch scale.
-	 */
-	public void markDirtyCanvas(Pass pass, int canvasX, int canvasY, int canvasW, int canvasH)
-	{
-		if (canvasW <= 0 || canvasH <= 0)
-		{
-			return;
-		}
-		double sx = getScaleX();
-		double sy = getScaleY();
-		int x = (int) Math.floor(canvasX * sx);
-		int y = (int) Math.floor(canvasY * sy);
-		int w = (int) Math.ceil((canvasX + canvasW) * sx) - x;
-		int h = (int) Math.ceil((canvasY + canvasH) * sy) - y;
-		markDirty(pass, x, y, w, h);
+		state(pass).touched = true;
 	}
 
 	public boolean isDirty(Pass pass)
 	{
-		DirtyPass state = state(pass);
-		return state.dirty || state.pendingZero != null;
+		PassState state = state(pass);
+		return state.touched || state.hadContent;
 	}
 
 	/**
-	 * Region that must be uploaded this frame (current draws unioned with cleared previous),
-	 * or null if nothing to upload. May be the full buffer when the dirty area is large.
+	 * Full buffer rectangle when this pass needs upload, otherwise null.
 	 */
 	public Rectangle getUploadRect(Pass pass)
 	{
-		DirtyPass state = state(pass);
 		BufferedImage image = getImage(pass);
-		if (image == null)
+		if (image == null || !isDirty(pass))
 		{
 			return null;
 		}
-		if (!state.dirty && state.pendingZero == null)
-		{
-			return null;
-		}
-
-		Rectangle rect = null;
-		if (state.pendingZero != null)
-		{
-			rect = new Rectangle(state.pendingZero);
-		}
-		if (state.current != null)
-		{
-			rect = rect == null ? new Rectangle(state.current) : rect.union(state.current);
-		}
-		if (rect == null)
-		{
-			return null;
-		}
-
-		long area = (long) rect.width * rect.height;
-		long full = (long) image.getWidth() * image.getHeight();
-		if (full > 0 && area >= (long) (full * FULL_UPLOAD_AREA_RATIO))
-		{
-			return new Rectangle(0, 0, image.getWidth(), image.getHeight());
-		}
-		return rect;
+		return new Rectangle(0, 0, image.getWidth(), image.getHeight());
 	}
 
 	/**
-	 * Call after a successful GPU/CPU composite so the next frame can clear this region.
+	 * Call after a successful GPU/CPU composite so the next frame can clear this pass.
 	 */
 	public void finishComposite(Pass pass)
 	{
-		DirtyPass state = state(pass);
-		state.previous = state.current != null ? copyRect(state.current) : null;
-		state.pendingZero = null;
+		PassState state = state(pass);
+		state.hadContent = state.touched;
+		state.touched = false;
 	}
 
 	public BufferedImage getImage(Pass pass)
@@ -476,116 +356,30 @@ public class NativeOverlayBuffer
 		return uploadScratch;
 	}
 
-	/**
-	 * @deprecated Use {@link #getPremultipliedUploadPixels(Pass, Rectangle)} with {@link #getUploadRect(Pass)}.
-	 */
-	@Deprecated
-	public int[] getPremultipliedPixels(Pass pass)
-	{
-		Rectangle rect = getUploadRect(pass);
-		BufferedImage image = getImage(pass);
-		if (rect == null || image == null)
-		{
-			return null;
-		}
-		if (rect.x == 0 && rect.y == 0 && rect.width == image.getWidth() && rect.height == image.getHeight())
-		{
-			// Full-buffer path into the long-lived upload array (old callers / resize).
-			int[] src = getPixels(pass);
-			int[] dest = pass == Pass.ABOVE_UI ? abovePremultipliedUpload : underPremultipliedUpload;
-			if (dest == null || dest.length != src.length)
-			{
-				dest = new int[src.length];
-				if (pass == Pass.ABOVE_UI)
-				{
-					abovePremultipliedUpload = dest;
-				}
-				else
-				{
-					underPremultipliedUpload = dest;
-				}
-			}
-			premultiplyInto(src, dest, 0, src.length);
-			return dest;
-		}
-		return getPremultipliedUploadPixels(pass, rect);
-	}
-
-	private static void premultiplyInto(int[] src, int[] dest, int start, int end)
-	{
-		for (int i = start; i < end; i++)
-		{
-			int p = src[i];
-			int a = (p >>> 24) & 0xFF;
-			if (a == 0)
-			{
-				dest[i] = 0;
-			}
-			else if (a == 255)
-			{
-				dest[i] = p;
-			}
-			else
-			{
-				int r = (p >>> 16) & 0xFF;
-				int g = (p >>> 8) & 0xFF;
-				int b = p & 0xFF;
-				dest[i] = (a << 24)
-					| (((r * a + 127) / 255) << 16)
-					| (((g * a + 127) / 255) << 8)
-					| ((b * a + 127) / 255);
-			}
-		}
-	}
-
-	private DirtyPass state(Pass pass)
+	private PassState state(Pass pass)
 	{
 		return pass == Pass.ABOVE_UI ? above : under;
-	}
-
-	private static void clearRect(int[] pixels, int imgW, Rectangle r)
-	{
-		if (pixels == null || r == null)
-		{
-			return;
-		}
-		for (int y = 0; y < r.height; y++)
-		{
-			int row = (r.y + y) * imgW + r.x;
-			Arrays.fill(pixels, row, row + r.width, 0);
-		}
-	}
-
-	private static Rectangle copyRect(Rectangle r)
-	{
-		return r == null ? null : new Rectangle(r);
 	}
 
 	public void release()
 	{
 		underImage = null;
 		aboveImage = null;
-		underPremultipliedUpload = null;
-		abovePremultipliedUpload = null;
 		uploadScratch = null;
 		preparedFrameId = -1;
 		under.reset();
 		above.reset();
 	}
 
-	private static final class DirtyPass
+	private static final class PassState
 	{
-		boolean dirty;
-		Rectangle current;
-		Rectangle previous;
-		Rectangle pendingZero;
+		boolean touched;
+		boolean hadContent;
 
 		void reset()
 		{
-			dirty = false;
-			current = null;
-			previous = null;
-			pendingZero = null;
+			touched = false;
+			hadContent = false;
 		}
 	}
 }

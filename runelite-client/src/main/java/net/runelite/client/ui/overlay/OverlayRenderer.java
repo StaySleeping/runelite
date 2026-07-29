@@ -320,8 +320,8 @@ public class OverlayRenderer extends MouseAdapter
 					{
 						nativeGraphics = target.createGraphics();
 						OverlayUtil.setNativeOverlayProperties(nativeGraphics,
-							nativeOverlayBuffer.getVisualSizeFactorX(),
-							nativeOverlayBuffer.getVisualSizeFactorY());
+							nativeOverlayBuffer.getPanelContentScaleX(),
+							nativeOverlayBuffer.getPanelContentScaleY());
 						double sx = nativeOverlayBuffer.getScaleX();
 						double sy = nativeOverlayBuffer.getScaleY();
 						nativeGraphics.scale(sx, sy);
@@ -390,20 +390,7 @@ public class OverlayRenderer extends MouseAdapter
 
 				if (overlayNative)
 				{
-					Rectangle hit = getHitBounds(overlay);
-					if (hit.width > 0 && hit.height > 0)
-					{
-						nativeOverlayBuffer.markDirtyCanvas(
-							nativeOverlayBuffer.passForLayer(layer),
-							hit.x, hit.y, hit.width, hit.height);
-					}
-					else
-					{
-						// DYNAMIC overlays may leave empty bounds; dirty the layer clip.
-						nativeOverlayBuffer.markDirtyCanvas(
-							nativeOverlayBuffer.passForLayer(layer),
-							clip.x, clip.y, clip.width, clip.height);
-					}
+					nativeOverlayBuffer.markDirty(nativeOverlayBuffer.passForLayer(layer));
 				}
 
 				// Adjust snap corner based on where the overlay was drawn (visual bounds)
@@ -522,8 +509,8 @@ public class OverlayRenderer extends MouseAdapter
 			return new Rectangle(0, 0, logicalWidth, logicalHeight);
 		}
 
-		double fx = nativeOverlayBuffer.getVisualSizeFactorX();
-		double fy = nativeOverlayBuffer.getVisualSizeFactorY();
+		double fx = nativeOverlayBuffer.getPanelContentScaleX();
+		double fy = nativeOverlayBuffer.getPanelContentScaleY();
 		if (fx == 1.0 && fy == 1.0)
 		{
 			return new Rectangle(0, 0, logicalWidth, logicalHeight);
@@ -893,7 +880,7 @@ public class OverlayRenderer extends MouseAdapter
 			if (nativePass)
 			{
 				// Fixed overlay size: cancel stretch on glyphs. Otherwise keep full size.
-				float factor = (float) nativeOverlayBuffer.getVisualSizeFactorX();
+				float factor = (float) nativeOverlayBuffer.getPanelContentScaleX();
 				if (factor != 1.0f)
 				{
 					graphics.setFont(font.deriveFont(font.getSize2D() * factor));
@@ -970,8 +957,8 @@ public class OverlayRenderer extends MouseAdapter
 		}
 		Graphics2D g = target.createGraphics();
 		OverlayUtil.setNativeOverlayProperties(g,
-			nativeOverlayBuffer.getVisualSizeFactorX(),
-			nativeOverlayBuffer.getVisualSizeFactorY());
+			nativeOverlayBuffer.getPanelContentScaleX(),
+			nativeOverlayBuffer.getPanelContentScaleY());
 		g.scale(nativeOverlayBuffer.getScaleX(), nativeOverlayBuffer.getScaleY());
 		return g;
 	}

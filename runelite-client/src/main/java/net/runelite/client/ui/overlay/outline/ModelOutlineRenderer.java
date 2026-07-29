@@ -1075,7 +1075,6 @@ public class ModelOutlineRenderer
 		nativePass = nativeOverlayBuffer.isActive() && client.isGpu() && OverlayUtil.isCurrentOverlayNative();
 		if (nativePass)
 		{
-			nativeOverlayBuffer.prepareFrame();
 			scaleX = nativeOverlayBuffer.getScaleX();
 			scaleY = nativeOverlayBuffer.getScaleY();
 		}
@@ -1109,8 +1108,7 @@ public class ModelOutlineRenderer
 
 		if (nativePass)
 		{
-			nativeOverlayBuffer.markDirtyCanvas(NativeOverlayBuffer.Pass.UNDER_UI,
-				croppedX1, croppedY1, croppedWidth, croppedHeight);
+			nativeOverlayBuffer.markDirty(NativeOverlayBuffer.Pass.UNDER_UI);
 		}
 
 		resetVisited(croppedWidth * croppedHeight);

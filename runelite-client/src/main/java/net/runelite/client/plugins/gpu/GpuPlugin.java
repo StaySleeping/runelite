@@ -1661,7 +1661,7 @@ public class GpuPlugin extends Plugin implements DrawCallbacks
 
 		if (lastOverlayWidth != width || lastOverlayHeight != height)
 		{
-			// Allocate and clear so undefined texels outside the dirty upload cannot ghost.
+			// Allocate and clear so undefined texels cannot ghost.
 			int[] clear = nativeOverlayBuffer.getTransparentTextureInit(width, height);
 			glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, width, height, 0, GL_BGRA, GL_UNSIGNED_INT_8_8_8_8_REV, clear);
 			lastOverlayWidth = width;
@@ -1677,7 +1677,7 @@ public class GpuPlugin extends Plugin implements DrawCallbacks
 			return;
 		}
 
-		glTexSubImage2D(GL_TEXTURE_2D, 0, upload.x, upload.y, upload.width, upload.height,
+		glTexSubImage2D(GL_TEXTURE_2D, 0, 0, 0, width, height,
 			GL_BGRA, GL_UNSIGNED_INT_8_8_8_8_REV, pixels);
 
 		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);

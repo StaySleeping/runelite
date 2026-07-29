@@ -245,7 +245,7 @@ public class Notifier
 		return appName + " - " + name;
 	}
 
-	public boolean processFlash(final Graphics2D graphics)
+	public void processFlash(final Graphics2D graphics)
 	{
 		if (flashStart == null || flashNotification == null || flashColor == null
 			|| client.getGameState() != GameState.LOGGED_IN
@@ -254,7 +254,7 @@ public class Notifier
 			flashStart = null;
 			flashNotification = null;
 			flashColor = null;
-			return false;
+			return;
 		}
 
 		if (Instant.now().minusMillis(MINIMUM_FLASH_DURATION_MILLIS).isAfter(flashStart))
@@ -266,7 +266,7 @@ public class Notifier
 					flashStart = null;
 					flashNotification = null;
 					flashColor = null;
-					return false;
+					return;
 				case SOLID_UNTIL_CANCELLED:
 				case FLASH_UNTIL_CANCELLED:
 					// Any interaction with the client since the notification started will cancel it after the minimum duration
@@ -277,7 +277,7 @@ public class Notifier
 						flashStart = null;
 						flashNotification = null;
 						flashColor = null;
-						return false;
+						return;
 					}
 					break;
 			}
@@ -288,14 +288,13 @@ public class Notifier
 			&& (flashNotification == FlashNotification.FLASH_TWO_SECONDS
 			|| flashNotification == FlashNotification.FLASH_UNTIL_CANCELLED))
 		{
-			return false;
+			return;
 		}
 
 		final Color color = graphics.getColor();
 		graphics.setColor(flashColor);
 		graphics.fill(new Rectangle(client.getCanvas().getSize()));
 		graphics.setColor(color);
-		return true;
 	}
 
 	private void sendNotification(
