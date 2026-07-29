@@ -102,8 +102,8 @@ public abstract class Overlay implements LayoutableRenderableEntity
 	private boolean snappable = true;
 
 	/**
-	 * When native resolution overlays is enabled, whether this overlay draws into the
-	 * native (display-resolution) buffer. Builtin overlays default to true. Hub and
+	 * When stretched mode is on, whether this overlay draws into the native
+	 * (display-resolution) buffer. Builtin overlays default to true. Hub and
 	 * sideloaded plugin overlays default to false and must opt in.
 	 */
 	@Setter(AccessLevel.PROTECTED)

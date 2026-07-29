@@ -30,6 +30,7 @@ import java.awt.Graphics;
 import java.awt.Graphics2D;
 import java.awt.GraphicsConfiguration;
 import java.awt.Image;
+import java.awt.Rectangle;
 import java.awt.RenderingHints;
 import java.awt.event.KeyEvent;
 import java.awt.event.MouseEvent;
@@ -409,9 +410,23 @@ public class Hooks implements Callbacks
 		try
 		{
 			Graphics2D flashAndUiGraphics = overlayGraphics != null ? overlayGraphics : graphics2d;
-			notifier.processFlash(flashAndUiGraphics);
-			// Draw clientUI overlays
-			clientUi.paintOverlays(flashAndUiGraphics);
+			NativeOverlayBuffer nativeBuffer = renderer.getNativeOverlayBuffer();
+			if (notifier.processFlash(flashAndUiGraphics) && overlayGraphics != null)
+			{
+				nativeBuffer.markDirty(NativeOverlayBuffer.Pass.ABOVE_UI);
+			}
+			if (clientUi.paintOverlays(flashAndUiGraphics) && overlayGraphics != null)
+			{
+				Rectangle btn = clientUi.getSidebarButtonPosition();
+				if (btn != null && !btn.isEmpty())
+				{
+					nativeBuffer.markDirtyCanvas(NativeOverlayBuffer.Pass.ABOVE_UI, btn.x, btn.y, btn.width, btn.height);
+				}
+				else
+				{
+					nativeBuffer.markDirty(NativeOverlayBuffer.Pass.ABOVE_UI);
+				}
+			}
 		}
 		finally
 		{
@@ -475,15 +490,20 @@ public class Hooks implements Callbacks
 			stretchedGraphics.drawImage(image, 0, 0, stretchedDimensions.width, stretchedDimensions.height, null);
 
 			var nativeBuffer = renderer.getNativeOverlayBuffer();
-			if (nativeBuffer.isActive())
+			if (nativeBuffer.isActive() && nativeBuffer.isDirty(NativeOverlayBuffer.Pass.ABOVE_UI))
 			{
 				// Under-UI overlays stay in the canvas on the CPU path so the bank covers them.
 				// Only above-UI overlays are composited here after stretch.
 				BufferedImage above = nativeBuffer.getImage(NativeOverlayBuffer.Pass.ABOVE_UI);
-				if (above != null)
+				Rectangle upload = nativeBuffer.getUploadRect(NativeOverlayBuffer.Pass.ABOVE_UI);
+				if (above != null && upload != null)
 				{
 					stretchedGraphics.setComposite(AlphaComposite.SrcOver);
-					stretchedGraphics.drawImage(above, 0, 0, null);
+					stretchedGraphics.drawImage(above,
+						upload.x, upload.y, upload.x + upload.width, upload.y + upload.height,
+						upload.x, upload.y, upload.x + upload.width, upload.y + upload.height,
+						null);
+					nativeBuffer.finishComposite(NativeOverlayBuffer.Pass.ABOVE_UI);
 				}
 			}
 

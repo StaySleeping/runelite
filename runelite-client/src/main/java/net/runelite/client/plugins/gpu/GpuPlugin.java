@@ -31,6 +31,7 @@ import java.awt.Canvas;
 import java.awt.Dimension;
 import java.awt.GraphicsConfiguration;
 import java.awt.Image;
+import java.awt.Rectangle;
 import java.awt.geom.AffineTransform;
 import java.awt.image.BufferedImage;
 import java.awt.image.DataBufferInt;
@@ -1638,14 +1639,14 @@ public class GpuPlugin extends Plugin implements DrawCallbacks
 	 */
 	private void drawNativeOverlays(NativeOverlayBuffer.Pass pass)
 	{
-		if (!nativeOverlayBuffer.isActive())
+		if (!nativeOverlayBuffer.isActive() || !nativeOverlayBuffer.isDirty(pass))
 		{
 			return;
 		}
 
 		BufferedImage overlayImage = nativeOverlayBuffer.getImage(pass);
-		int[] pixels = nativeOverlayBuffer.getPremultipliedPixels(pass);
-		if (overlayImage == null || pixels == null)
+		Rectangle upload = nativeOverlayBuffer.getUploadRect(pass);
+		if (overlayImage == null || upload == null)
 		{
 			return;
 		}
@@ -1654,20 +1655,30 @@ public class GpuPlugin extends Plugin implements DrawCallbacks
 		final int height = overlayImage.getHeight();
 
 		glEnable(GL_BLEND);
-		// Premultiplied ARGB from getPremultipliedPixels()
+		// Premultiplied ARGB from getPremultipliedUploadPixels()
 		glBlendFunc(GL_ONE, GL_ONE_MINUS_SRC_ALPHA);
 		glBindTexture(GL_TEXTURE_2D, overlayTexture);
 
 		if (lastOverlayWidth != width || lastOverlayHeight != height)
 		{
-			glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, width, height, 0, GL_BGRA, GL_UNSIGNED_INT_8_8_8_8_REV, pixels);
+			// Allocate and clear so undefined texels outside the dirty upload cannot ghost.
+			int[] clear = nativeOverlayBuffer.getTransparentTextureInit(width, height);
+			glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, width, height, 0, GL_BGRA, GL_UNSIGNED_INT_8_8_8_8_REV, clear);
 			lastOverlayWidth = width;
 			lastOverlayHeight = height;
 		}
-		else
+
+		int[] pixels = nativeOverlayBuffer.getPremultipliedUploadPixels(pass, upload);
+		if (pixels == null)
 		{
-			glTexSubImage2D(GL_TEXTURE_2D, 0, 0, 0, width, height, GL_BGRA, GL_UNSIGNED_INT_8_8_8_8_REV, pixels);
+			glBindTexture(GL_TEXTURE_2D, 0);
+			glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+			glDisable(GL_BLEND);
+			return;
 		}
+
+		glTexSubImage2D(GL_TEXTURE_2D, 0, upload.x, upload.y, upload.width, upload.height,
+			GL_BGRA, GL_UNSIGNED_INT_8_8_8_8_REV, pixels);
 
 		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
 		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
@@ -1693,6 +1704,8 @@ public class GpuPlugin extends Plugin implements DrawCallbacks
 		glUseProgram(0);
 		glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
 		glDisable(GL_BLEND);
+
+		nativeOverlayBuffer.finishComposite(pass);
 	}
 
 	/**

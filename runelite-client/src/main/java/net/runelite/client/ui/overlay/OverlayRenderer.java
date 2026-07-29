@@ -307,12 +307,11 @@ public class OverlayRenderer extends MouseAdapter
 			{
 				final boolean overlayNative = shouldUseNativePass(overlay, layer);
 				final Graphics2D drawGraphics;
-				final double scaleX;
-				final double scaleY;
 
 				if (overlayNative)
 				{
-					BufferedImage target = nativeOverlayBuffer.getImage(nativeOverlayBuffer.passForLayer(layer));
+					NativeOverlayBuffer.Pass pass = nativeOverlayBuffer.passForLayer(layer);
+					BufferedImage target = nativeOverlayBuffer.getImage(pass);
 					if (target == null)
 					{
 						continue;
@@ -320,21 +319,19 @@ public class OverlayRenderer extends MouseAdapter
 					if (nativeGraphics == null)
 					{
 						nativeGraphics = target.createGraphics();
-						OverlayUtil.setNativeOverlayProperties(nativeGraphics, nativeOverlayBuffer.getVisualSizeFactorX());
+						OverlayUtil.setNativeOverlayProperties(nativeGraphics,
+							nativeOverlayBuffer.getVisualSizeFactorX(),
+							nativeOverlayBuffer.getVisualSizeFactorY());
 						double sx = nativeOverlayBuffer.getScaleX();
 						double sy = nativeOverlayBuffer.getScaleY();
 						nativeGraphics.scale(sx, sy);
 						nativeGraphics.setStroke(new BasicStroke((float) (1.0 / Math.max(sx, sy))));
 					}
-					scaleX = nativeOverlayBuffer.getScaleX();
-					scaleY = nativeOverlayBuffer.getScaleY();
 					drawGraphics = nativeGraphics;
 				}
 				else
 				{
 					drawGraphics = graphics;
-					scaleX = 1;
-					scaleY = 1;
 				}
 
 				final AffineTransform transform = drawGraphics.getTransform();
@@ -384,11 +381,29 @@ public class OverlayRenderer extends MouseAdapter
 				boolean previousNative = OverlayUtil.setCurrentOverlayNative(overlayNative);
 				try
 				{
-					safeRender(overlay, drawGraphics, location, overlayNative, scaleX, scaleY);
+					safeRender(overlay, drawGraphics, location, overlayNative);
 				}
 				finally
 				{
 					OverlayUtil.setCurrentOverlayNative(previousNative);
+				}
+
+				if (overlayNative)
+				{
+					Rectangle hit = getHitBounds(overlay);
+					if (hit.width > 0 && hit.height > 0)
+					{
+						nativeOverlayBuffer.markDirtyCanvas(
+							nativeOverlayBuffer.passForLayer(layer),
+							hit.x, hit.y, hit.width, hit.height);
+					}
+					else
+					{
+						// DYNAMIC overlays may leave empty bounds; dirty the layer clip.
+						nativeOverlayBuffer.markDirtyCanvas(
+							nativeOverlayBuffer.passForLayer(layer),
+							clip.x, clip.y, clip.width, clip.height);
+					}
 				}
 
 				// Adjust snap corner based on where the overlay was drawn (visual bounds)
@@ -474,7 +489,7 @@ public class OverlayRenderer extends MouseAdapter
 	}
 
 	/**
-	 * Visual hit-test bounds in canvas space, accounting for overlay size mode and scale.
+	 * Visual hit-test bounds in canvas space, accounting for stretch overlay scaling.
 	 */
 	private Rectangle getHitBounds(Overlay overlay)
 	{
@@ -488,7 +503,7 @@ public class OverlayRenderer extends MouseAdapter
 	}
 
 	/**
-	 * Canvas-space width/height after native overlay sizing (size mode + overlay scale).
+	 * Canvas-space width/height after native overlay sizing.
 	 * Widget overlays only reposition client widgets (which follow UI stretch), so they
 	 * keep logical size for hit-testing, clamp, and Alt bounds.
 	 */
@@ -868,17 +883,25 @@ public class OverlayRenderer extends MouseAdapter
 		}
 	}
 
-	private void safeRender(Overlay overlay, Graphics2D graphics, Point point, boolean nativePass, double scaleX, double scaleY)
+	private void safeRender(Overlay overlay, Graphics2D graphics, Point point, boolean nativePass)
 	{
 		final OverlayPosition position = overlay.getPosition();
 
 		// Set font based on configuration
 		if (position == OverlayPosition.DYNAMIC || position == OverlayPosition.DETACHED)
 		{
-			if (nativePass && scaleX > 0)
+			if (nativePass)
 			{
-				// Keep world overlay text at unscaled display size
-				graphics.setFont(font.deriveFont(font.getSize2D() / (float) scaleX));
+				// Fixed overlay size: cancel stretch on glyphs. Otherwise keep full size.
+				float factor = (float) nativeOverlayBuffer.getVisualSizeFactorX();
+				if (factor != 1.0f)
+				{
+					graphics.setFont(font.deriveFont(font.getSize2D() * factor));
+				}
+				else
+				{
+					graphics.setFont(font);
+				}
 			}
 			else
 			{
@@ -946,7 +969,9 @@ public class OverlayRenderer extends MouseAdapter
 			return null;
 		}
 		Graphics2D g = target.createGraphics();
-		OverlayUtil.setNativeOverlayProperties(g, nativeOverlayBuffer.getVisualSizeFactorX());
+		OverlayUtil.setNativeOverlayProperties(g,
+			nativeOverlayBuffer.getVisualSizeFactorX(),
+			nativeOverlayBuffer.getVisualSizeFactorY());
 		g.scale(nativeOverlayBuffer.getScaleX(), nativeOverlayBuffer.getScaleY());
 		return g;
 	}

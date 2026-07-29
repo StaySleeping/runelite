@@ -313,48 +313,10 @@ public interface RuneLiteConfig extends Config
 	}
 
 	@ConfigItem(
-		keyName = "nativeResolutionOverlays",
-		name = "Native resolution overlays",
-		description = "When stretched mode is enabled, draw RuneLite overlays at display resolution instead of upscaling them with the game UI. World overlays (tiles, NPC highlights) become sharper. Overlay layers still respect under/above interface ordering (e.g. bank covers under-widget overlays). Infoboxes always follow this setting. Other Plugin Hub overlays stay on the legacy path until they opt in.",
-		position = 28,
-		section = overlaySettings
-	)
-	default boolean nativeResolutionOverlays()
-	{
-		return false;
-	}
-
-	@ConfigItem(
-		keyName = "overlaySizeMode",
-		name = "Overlay size mode",
-		description = "When native resolution overlays is on: Canvas keeps interface overlays the same size as without stretched mode; Match UI sizes them like the stretched game UI. Does not affect world overlays.",
-		position = 29,
-		section = overlaySettings
-	)
-	default OverlaySizeMode overlaySizeMode()
-	{
-		return OverlaySizeMode.CANVAS;
-	}
-
-	@ConfigItem(
-		keyName = "overlayScale",
-		name = "Overlay scale",
-		description = "Extra scale for interface overlays when native resolution overlays is on. 100% is exactly the selected overlay size mode. Does not affect world overlays.",
-		position = 30,
-		section = overlaySettings
-	)
-	@Units(Units.PERCENT)
-	@Range(min = 25, max = 200)
-	default int overlayScale()
-	{
-		return 100;
-	}
-
-	@ConfigItem(
 		keyName = "fontType",
 		name = "Dynamic overlay font",
 		description = "Configures what font is used for in-game overlays such as player name, ground items, etc.",
-		position = 31,
+		position = 28,
 		section = overlaySettings
 	)
 	default FontType dynamicOverlayFont()
@@ -366,7 +328,7 @@ public interface RuneLiteConfig extends Config
 		keyName = "tooltipFontType",
 		name = "Tooltip font",
 		description = "Configures what font is used for in-game tooltips such as food stats, NPC names, etc.",
-		position = 32,
+		position = 29,
 		section = overlaySettings
 	)
 	default FontType tooltipFont()
@@ -378,7 +340,7 @@ public interface RuneLiteConfig extends Config
 		keyName = "interfaceFontType",
 		name = "Interface font",
 		description = "Configures what font is used for in-game interface overlays such as panels, opponent info, clue scrolls etc.",
-		position = 33,
+		position = 30,
 		section = overlaySettings
 	)
 	default FontType interfaceFont()
@@ -390,7 +352,7 @@ public interface RuneLiteConfig extends Config
 		keyName = "infoboxFontType",
 		name = "Infobox font",
 		description = "Configures what font is used for infoboxes.",
-		position = 34,
+		position = 31,
 		section = overlaySettings
 	)
 	default FontType infoboxFont()
@@ -402,7 +364,7 @@ public interface RuneLiteConfig extends Config
 		keyName = "tooltipPosition",
 		name = "Tooltip position",
 		description = "Configures whether to show the tooltip above or under the cursor.",
-		position = 35,
+		position = 32,
 		section = overlaySettings
 	)
 	default TooltipPositionType tooltipPosition()

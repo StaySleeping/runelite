@@ -1109,6 +1109,12 @@ public class ModelOutlineRenderer
 		croppedWidth = croppedX2 - croppedX1;
 		croppedHeight = croppedY2 - croppedY1;
 
+		if (nativePass)
+		{
+			nativeOverlayBuffer.markDirtyCanvas(NativeOverlayBuffer.Pass.UNDER_UI,
+				croppedX1, croppedY1, croppedWidth, croppedHeight);
+		}
+
 		resetVisited(croppedWidth * croppedHeight);
 
 		simulateModelRasterizationForOutline(model);

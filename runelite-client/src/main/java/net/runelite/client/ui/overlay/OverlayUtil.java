@@ -55,11 +55,20 @@ public class OverlayUtil
 	private static final ThreadLocal<Boolean> CURRENT_OVERLAY_NATIVE = ThreadLocal.withInitial(() -> false);
 
 	/**
-	 * Canvas-space scale for DYNAMIC decorations (e.g. progress pies) under native overlays.
+	 * Canvas-space scale for DYNAMIC decorations (e.g. progress pies, images, text) under native overlays.
 	 * Matches {@link net.runelite.client.ui.overlay.NativeOverlayBuffer#getVisualSizeFactorX()}:
-	 * Canvas size mode cancels stretch; Match UI keeps stretch; both multiply by overlay scale %.
+	 * fixed overlay size cancels stretch; otherwise stretch is kept.
 	 */
 	public static final RenderingHints.Key KEY_NATIVE_VISUAL_SIZE_FACTOR = new RenderingHints.Key(0x4e4f5649)
+	{
+		@Override
+		public boolean isCompatibleValue(Object val)
+		{
+			return val instanceof Number;
+		}
+	};
+
+	public static final RenderingHints.Key KEY_NATIVE_VISUAL_SIZE_FACTOR_Y = new RenderingHints.Key(0x4e4f5659)
 	{
 		@Override
 		public boolean isCompatibleValue(Object val)
@@ -135,36 +144,27 @@ public class OverlayUtil
 	}
 
 	/**
-	 * Canvas-space width/height the image occupies after native stretch inverse-scale.
+	 * Canvas-space width/height the image occupies after size-mode scaling.
 	 * Use this for layout next to text instead of {@link BufferedImage#getWidth()}/{@link BufferedImage#getHeight()}.
 	 */
 	public static Dimension getImageLayoutSize(Graphics2D graphics, BufferedImage image)
 	{
-		AffineTransform transform = graphics.getTransform();
-		double sx = Math.abs(transform.getScaleX());
-		double sy = Math.abs(transform.getScaleY());
-		if (sx == 0)
-		{
-			sx = 1;
-		}
-		if (sy == 0)
-		{
-			sy = 1;
-		}
-		if (sx == 1.0 && sy == 1.0)
+		double fx = getNativeVisualSizeFactor(graphics);
+		double fy = getNativeVisualSizeFactorY(graphics);
+		if (fx == 1.0 && fy == 1.0)
 		{
 			return new Dimension(image.getWidth(), image.getHeight());
 		}
 		return new Dimension(
-			Math.max(1, (int) Math.round(image.getWidth() / sx)),
-			Math.max(1, (int) Math.round(image.getHeight() / sy)));
+			Math.max(1, (int) Math.round(image.getWidth() * fx)),
+			Math.max(1, (int) Math.round(image.getHeight() * fy)));
 	}
 
 	/**
 	 * Renders an image at a canvas location. {@code imgLoc} is the top-left of the full bitmap
 	 * footprint (as returned by {@link Perspective#getCanvasImageLocation} / actor canvas image
-	 * helpers). When the graphics transform is stretch-scaled, the sprite is inverse-scaled and
-	 * centered in that footprint so world icons keep their anchor.
+	 * helpers). Under native overlays, fixed overlay size inverse-scales the sprite (and centers it
+	 * in that footprint); otherwise it draws at full bitmap size so it grows with stretch.
 	 */
 	public static void renderImageLocation(Graphics2D graphics, Point imgLoc, BufferedImage image)
 	{
@@ -185,15 +185,15 @@ public class OverlayUtil
 
 	private static void renderImageLocationExact(Graphics2D graphics, int x, int y, BufferedImage image)
 	{
-		// Under native overlays the Graphics2D has stretch scale applied for canvas-space
-		// positioning. Inverse-scale the sprite so it matches DYNAMIC text (inverse-scaled font).
-		AffineTransform transform = graphics.getTransform();
-		double sx = transform.getScaleX();
-		double sy = transform.getScaleY();
-		if (sx != 1.0 || sy != 1.0)
+		// Under native overlays the Graphics2D has stretch scale for canvas-space positioning.
+		// Apply size factor so sprites match DYNAMIC text (fixed size cancels stretch).
+		double fx = getNativeVisualSizeFactor(graphics);
+		double fy = getNativeVisualSizeFactorY(graphics);
+		if (fx != 1.0 || fy != 1.0)
 		{
+			AffineTransform transform = graphics.getTransform();
 			graphics.translate(x, y);
-			graphics.scale(1.0 / sx, 1.0 / sy);
+			graphics.scale(fx, fy);
 			graphics.drawImage(image, 0, 0, null);
 			graphics.setTransform(transform);
 		}
@@ -290,12 +290,13 @@ public class OverlayUtil
 	}
 
 	/**
-	 * Antialiasing plus size-mode/overlay-scale factor for the native overlay Graphics2D.
+	 * Antialiasing plus stretch overlay-size factors for the native overlay Graphics2D.
 	 */
-	public static void setNativeOverlayProperties(Graphics2D graphics, double visualSizeFactor)
+	public static void setNativeOverlayProperties(Graphics2D graphics, double visualSizeFactorX, double visualSizeFactorY)
 	{
 		setGraphicProperties(graphics);
-		graphics.setRenderingHint(KEY_NATIVE_VISUAL_SIZE_FACTOR, visualSizeFactor);
+		graphics.setRenderingHint(KEY_NATIVE_VISUAL_SIZE_FACTOR, visualSizeFactorX);
+		graphics.setRenderingHint(KEY_NATIVE_VISUAL_SIZE_FACTOR_Y, visualSizeFactorY);
 	}
 
 	public static double getNativeVisualSizeFactor(Graphics2D graphics)
@@ -306,6 +307,16 @@ public class OverlayUtil
 			return ((Number) value).doubleValue();
 		}
 		return 1.0;
+	}
+
+	public static double getNativeVisualSizeFactorY(Graphics2D graphics)
+	{
+		Object value = graphics.getRenderingHint(KEY_NATIVE_VISUAL_SIZE_FACTOR_Y);
+		if (value instanceof Number)
+		{
+			return ((Number) value).doubleValue();
+		}
+		return getNativeVisualSizeFactor(graphics);
 	}
 
 	/**

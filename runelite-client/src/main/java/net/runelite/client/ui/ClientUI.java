@@ -1008,12 +1008,13 @@ public class ClientUI
 	/**
 	 * Paint UI related overlays to target graphics
 	 * @param graphics target graphics
+	 * @return true if something was painted
 	 */
-	public void paintOverlays(final Graphics2D graphics)
+	public boolean paintOverlays(final Graphics2D graphics)
 	{
 		if (withTitleBar)
 		{
-			return;
+			return false;
 		}
 
 		final Client client = (Client) this.client;
@@ -1032,13 +1033,21 @@ public class ClientUI
 			client.getMouseCanvasPosition().getX() + client.getViewportXOffset(),
 			client.getMouseCanvasPosition().getY() + client.getViewportYOffset());
 
+		// Update button dimensions
+		sidebarButtonPosition.setBounds(x, y, image.getWidth(), image.getHeight());
+
 		if (sidebarButtonRange.contains(mousePosition.getX(), mousePosition.getY()))
 		{
 			graphics.drawImage(image, x, y, null);
+			return true;
 		}
 
-		// Update button dimensions
-		sidebarButtonPosition.setBounds(x, y, image.getWidth(), image.getHeight());
+		return false;
+	}
+
+	public Rectangle getSidebarButtonPosition()
+	{
+		return sidebarButtonPosition;
 	}
 
 	public GraphicsConfiguration getGraphicsConfiguration()

@@ -49,7 +49,7 @@ public class ProgressPieComponent implements RenderableEntity
 	@Override
 	public Dimension render(Graphics2D graphics)
 	{
-		// Under native overlays, apply size mode + overlay scale without affecting world polygons.
+		// Under native overlays, apply stretch size factor without affecting world polygons.
 		final double sizeFactor = OverlayUtil.getNativeVisualSizeFactor(graphics);
 		final int drawDiameter = Math.max(1, (int) Math.round(diameter * sizeFactor));
 		final int x = position.getX() - drawDiameter / 2;

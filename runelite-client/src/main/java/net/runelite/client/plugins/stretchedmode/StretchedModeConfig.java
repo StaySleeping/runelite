@@ -36,7 +36,8 @@ public interface StretchedModeConfig extends Config
 	@ConfigItem(
 		keyName = "keepAspectRatio",
 		name = "Keep aspect ratio",
-		description = "Keeps the aspect ratio when stretching."
+		description = "Keeps the aspect ratio when stretching.",
+		position = 0
 	)
 	default boolean keepAspectRatio()
 	{
@@ -46,7 +47,8 @@ public interface StretchedModeConfig extends Config
 	@ConfigItem(
 		keyName = "increasedPerformance",
 		name = "Increased performance mode",
-		description = "Uses a fast algorithm when stretching, lowering quality but increasing performance."
+		description = "Uses a fast algorithm when stretching, lowering quality but increasing performance.",
+		position = 1
 	)
 	default boolean increasedPerformance()
 	{
@@ -56,7 +58,8 @@ public interface StretchedModeConfig extends Config
 	@ConfigItem(
 		keyName = "integerScaling",
 		name = "Integer scaling",
-		description = "Forces use of a whole number scale factor when stretching."
+		description = "Forces use of a whole number scale factor when stretching.",
+		position = 2
 	)
 	default boolean integerScaling()
 	{
@@ -66,11 +69,23 @@ public interface StretchedModeConfig extends Config
 	@ConfigItem(
 		keyName = "scalingFactor",
 		name = "Resizable scaling",
-		description = "In resizable mode, the game is reduced in size this much before it's stretched."
+		description = "In resizable mode, the game is reduced in size this much before it's stretched.",
+		position = 3
 	)
 	@Units(Units.PERCENT)
 	default int scalingFactor()
 	{
 		return 50;
+	}
+
+	@ConfigItem(
+		keyName = "fixedOverlaySize",
+		name = "Fixed overlay size",
+		description = "Keep RuneLite overlays (infoboxes, panels, names, etc.) at their original size instead of scaling them with the stretched game.",
+		position = 4
+	)
+	default boolean fixedOverlaySize()
+	{
+		return false;
 	}
 }
