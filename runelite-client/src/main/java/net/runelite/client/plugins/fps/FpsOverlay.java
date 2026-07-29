@@ -67,11 +67,17 @@ public class FpsOverlay extends Overlay
 		setLayer(OverlayLayer.ABOVE_WIDGETS);
 		setPriority(PRIORITY_HIGH);
 		setPosition(OverlayPosition.DYNAMIC);
+		setPreferNativeResolution(config.scaleWithNativeOverlays());
 	}
 
 	void onFocusChanged(FocusChanged event)
 	{
 		isFocused = event.isFocused();
+	}
+
+	void updateNativePreference()
+	{
+		setPreferNativeResolution(config.scaleWithNativeOverlays());
 	}
 
 	private boolean isEnforced()
@@ -88,6 +94,8 @@ public class FpsOverlay extends Overlay
 	@Override
 	public Dimension render(Graphics2D graphics)
 	{
+		setPreferNativeResolution(config.scaleWithNativeOverlays());
+
 		if (!config.drawFps())
 		{
 			return null;

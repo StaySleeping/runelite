@@ -79,6 +79,7 @@ public class FpsPlugin extends Plugin
 		if (event.getGroup().equals(CONFIG_GROUP_KEY))
 		{
 			drawListener.reloadConfig();
+			overlay.updateNativePreference();
 		}
 	}
 

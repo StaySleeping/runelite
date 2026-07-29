@@ -293,6 +293,9 @@ public class WorldHopperPlugin extends Plugin
 					panel.setWorldTypeFilters(config.worldTypeFilter());
 					updateList();
 					break;
+				case "scaleWithNativeOverlays":
+					worldHopperOverlay.updateNativePreference();
+					break;
 			}
 		}
 	}

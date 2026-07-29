@@ -159,4 +159,15 @@ public interface WorldHopperConfig extends Config
 	{
 		return false;
 	}
+
+	@ConfigItem(
+		keyName = "scaleWithNativeOverlays",
+		name = "Scale with native overlays",
+		description = "When stretched mode is on, draw the ping text sharp at canvas size. Turn off to keep the old stretched size.",
+		position = 12
+	)
+	default boolean scaleWithNativeOverlays()
+	{
+		return true;
+	}
 }
