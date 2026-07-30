@@ -109,39 +109,93 @@ public class OverlayUtil
 	/**
 	 * Draws a circular ring with 8-fold pixel symmetry. Prefer this over {@link Graphics2D#drawOval}
 	 * when antialiasing is off (e.g. GPU nearest UI pixel grid): stroked ovals bias top/left edges.
+	 * <p>
+	 * Size matches a {@link java.awt.BasicStroke} of {@code thickness} centered on an oval of
+	 * {@code diameter} (outer radius = diameter/2 + thickness/2).
 	 *
-	 * @param x top-left of the diameter×diameter bounds
-	 * @param thickness ring width in pixels, inset from the outer edge
+	 * @param x top-left of the diameter×diameter oval frame (same as {@code drawOval})
+	 * @param thickness stroke width in pixels
 	 */
 	public static void drawPixelRing(Graphics2D graphics, int x, int y, int diameter, int thickness)
 	{
-		if (diameter <= 0 || thickness <= 0)
+		drawPixelArc(graphics, x, y, diameter, thickness, 0, -360);
+	}
+
+	/**
+	 * Same as {@link #drawPixelRing} but only the arc used by {@link java.awt.geom.Arc2D}:
+	 * {@code startAngle} degrees (0 = 3 o'clock, CCW positive), {@code extentAngle} degrees
+	 * (negative = clockwise), matching {@code Arc2D} / regen meter conventions.
+	 */
+	public static void drawPixelArc(Graphics2D graphics, int x, int y, int diameter, int thickness,
+		double startAngle, double extentAngle)
+	{
+		if (diameter <= 0 || thickness <= 0 || extentAngle == 0)
 		{
 			return;
 		}
 
-		thickness = Math.min(thickness, Math.max(1, diameter / 2));
-		final double cx = x + diameter / 2.0 - 0.5;
-		final double cy = y + diameter / 2.0 - 0.5;
-		final double rOuter = diameter / 2.0 - 0.5;
-		final double rInner = Math.max(0, rOuter - thickness);
+		thickness = Math.min(thickness, Math.max(1, diameter));
+		final double cx = x + diameter / 2.0;
+		final double cy = y + diameter / 2.0;
+		final double rMid = diameter / 2.0;
+		final double rOuter = rMid + thickness / 2.0;
+		final double rInner = Math.max(0, rMid - thickness / 2.0);
 		final double outerSq = rOuter * rOuter;
 		final double innerSq = rInner * rInner;
+		final int pad = (int) Math.ceil(thickness / 2.0);
+		final boolean fullCircle = Math.abs(extentAngle) >= 360;
 
-		for (int py = y; py < y + diameter; py++)
+		for (int py = y - pad; py < y + diameter + pad; py++)
 		{
 			final double dy = py - cy;
 			final double dySq = dy * dy;
-			for (int px = x; px < x + diameter; px++)
+			for (int px = x - pad; px < x + diameter + pad; px++)
 			{
 				final double dx = px - cx;
 				final double d2 = dx * dx + dySq;
-				if (d2 <= outerSq && d2 > innerSq)
+				if (d2 > outerSq || d2 <= innerSq)
 				{
-					graphics.fillRect(px, py, 1, 1);
+					continue;
 				}
+				if (!fullCircle)
+				{
+					// Screen y-down → convert to Arc2D degrees (CCW from 3 o'clock, y-up)
+					final double deg = Math.toDegrees(Math.atan2(cy - py, px - cx));
+					if (!angleOnArc(deg, startAngle, extentAngle))
+					{
+						continue;
+					}
+				}
+				graphics.fillRect(px, py, 1, 1);
 			}
 		}
+	}
+
+	/**
+	 * Whether {@code deg} lies on an Arc2D from {@code start} through {@code extent} degrees.
+	 */
+	private static boolean angleOnArc(double deg, double start, double extent)
+	{
+		deg = normalizeDegrees360(deg);
+		start = normalizeDegrees360(start);
+		if (extent < 0)
+		{
+			// Clockwise distance from start to deg
+			final double clockwise = normalizeDegrees360(start - deg);
+			return clockwise <= -extent;
+		}
+		final double counterClockwise = normalizeDegrees360(deg - start);
+		return counterClockwise <= extent;
+	}
+
+	private static double normalizeDegrees360(double deg)
+	{
+		deg %= 360;
+		if (deg < 0)
+		{
+			deg += 360;
+		}
+		return deg;
 	}
 
 	@Deprecated
