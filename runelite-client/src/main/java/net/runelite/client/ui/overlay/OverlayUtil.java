@@ -110,8 +110,8 @@ public class OverlayUtil
 
 	/**
 	 * Draws a circular ring. With antialiasing on, uses a stroked ellipse (smooth Hybrid/Linear UI).
-	 * With antialiasing off (GPU nearest UI pixel grid), paints a symmetric Euclidean annulus —
-	 * slightly smaller than a centered {@link java.awt.BasicStroke} so cardinal tips are less harsh.
+	 * With antialiasing off (GPU nearest UI pixel grid), paints a symmetric annulus —
+	 * slightly smaller than a centered stroke, with horizontal radii inset so L/R tips flatten.
 	 *
 	 * @param x top-left of the diameter×diameter oval frame (same as {@code drawOval})
 	 * @param thickness stroke width in pixels
@@ -153,14 +153,21 @@ public class OverlayUtil
 			return;
 		}
 
-		// Nearest / AA-off: Euclidean ring, ~0.5px smaller than stroke-centered oval
+		// Nearest / AA-off: Euclidean ring, ~0.5px smaller than stroke-centered oval.
+		// Horizontal radii are inset another 0.5px so L/R don't end in a single tip pixel.
 		final double cx = x + diameter / 2.0 - 0.5;
 		final double cy = y + diameter / 2.0;
 		final double rMid = diameter / 2.0 - 0.5;
 		final double rOuter = rMid + thickness / 2.0;
 		final double rInner = Math.max(0, rMid - thickness / 2.0);
-		final double outerSq = rOuter * rOuter;
-		final double innerSq = rInner * rInner;
+		final double rOuterX = Math.max(0.5, rOuter - 0.5);
+		final double rOuterY = rOuter;
+		final double rInnerX = Math.max(0, rInner - 0.5);
+		final double rInnerY = rInner;
+		final double outerXSq = rOuterX * rOuterX;
+		final double outerYSq = rOuterY * rOuterY;
+		final double innerXSq = rInnerX * rInnerX;
+		final double innerYSq = rInnerY * rInnerY;
 		final int pad = (int) Math.ceil(thickness / 2.0);
 
 		for (int py = y - pad; py < y + diameter + pad; py++)
@@ -170,8 +177,13 @@ public class OverlayUtil
 			for (int px = x - pad; px < x + diameter + pad; px++)
 			{
 				final double dx = px - cx;
-				final double d2 = dx * dx + dySq;
-				if (d2 > outerSq || d2 <= innerSq)
+				final double dxSq = dx * dx;
+				if (dxSq / outerXSq + dySq / outerYSq > 1.0)
+				{
+					continue;
+				}
+				if (rInner > 0 && innerXSq > 0 && innerYSq > 0
+					&& dxSq / innerXSq + dySq / innerYSq <= 1.0)
 				{
 					continue;
 				}
