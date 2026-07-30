@@ -24,7 +24,6 @@
  */
 package net.runelite.client.plugins.prayer;
 
-import java.awt.BasicStroke;
 import java.awt.Color;
 import java.awt.Dimension;
 import java.awt.Graphics2D;
@@ -43,6 +42,7 @@ import net.runelite.api.widgets.Widget;
 import net.runelite.client.ui.overlay.Overlay;
 import net.runelite.client.ui.overlay.OverlayLayer;
 import net.runelite.client.ui.overlay.OverlayPosition;
+import net.runelite.client.ui.overlay.OverlayUtil;
 import net.runelite.client.ui.overlay.tooltip.Tooltip;
 import net.runelite.client.ui.overlay.tooltip.TooltipManager;
 import net.runelite.client.util.ColorUtil;
@@ -156,8 +156,7 @@ class PrayerDoseOverlay extends Overlay
 			endColor(startColor),
 			Math.sin(t)));
 
-		graphics.setStroke(new BasicStroke(2));
-		graphics.drawOval(orbInnerX, orbInnerY, orbInnerSize, orbInnerSize);
+		OverlayUtil.drawPixelRing(graphics, orbInnerX, orbInnerY, orbInnerSize, 2);
 		return null;
 	}
 

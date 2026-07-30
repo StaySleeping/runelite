@@ -106,6 +106,44 @@ public class OverlayUtil
 		graphics.fillOval(mini.getX() - MINIMAP_DOT_RADIUS / 2, mini.getY() - MINIMAP_DOT_RADIUS / 2, MINIMAP_DOT_RADIUS, MINIMAP_DOT_RADIUS);
 	}
 
+	/**
+	 * Draws a circular ring with 8-fold pixel symmetry. Prefer this over {@link Graphics2D#drawOval}
+	 * when antialiasing is off (e.g. GPU nearest UI pixel grid): stroked ovals bias top/left edges.
+	 *
+	 * @param x top-left of the diameter×diameter bounds
+	 * @param thickness ring width in pixels, inset from the outer edge
+	 */
+	public static void drawPixelRing(Graphics2D graphics, int x, int y, int diameter, int thickness)
+	{
+		if (diameter <= 0 || thickness <= 0)
+		{
+			return;
+		}
+
+		thickness = Math.min(thickness, Math.max(1, diameter / 2));
+		final double cx = x + diameter / 2.0 - 0.5;
+		final double cy = y + diameter / 2.0 - 0.5;
+		final double rOuter = diameter / 2.0 - 0.5;
+		final double rInner = Math.max(0, rOuter - thickness);
+		final double outerSq = rOuter * rOuter;
+		final double innerSq = rInner * rInner;
+
+		for (int py = y; py < y + diameter; py++)
+		{
+			final double dy = py - cy;
+			final double dySq = dy * dy;
+			for (int px = x; px < x + diameter; px++)
+			{
+				final double dx = px - cx;
+				final double d2 = dx * dx + dySq;
+				if (d2 <= outerSq && d2 > innerSq)
+				{
+					graphics.fillRect(px, py, 1, 1);
+				}
+			}
+		}
+	}
+
 	@Deprecated
 	public static void renderMinimapRect(Client client, Graphics2D graphics, Point center, int width, int height, Color color)
 	{
