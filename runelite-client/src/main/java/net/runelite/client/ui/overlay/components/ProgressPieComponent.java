@@ -28,7 +28,6 @@ import java.awt.BasicStroke;
 import java.awt.Color;
 import java.awt.Dimension;
 import java.awt.Graphics2D;
-import java.awt.RenderingHints;
 import java.awt.Stroke;
 import java.awt.geom.Arc2D;
 import lombok.Setter;
@@ -55,9 +54,6 @@ public class ProgressPieComponent implements RenderableEntity
 		final int x = position.getX() - drawDiameter / 2;
 		final int y = position.getY() - drawDiameter / 2;
 
-		final Object oldAa = graphics.getRenderingHint(RenderingHints.KEY_ANTIALIASING);
-		graphics.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
-
 		Arc2D.Float arc = new Arc2D.Float(Arc2D.PIE);
 		arc.setAngleStart(90);
 		arc.setAngleExtent(progress * 360);
@@ -81,11 +77,6 @@ public class ProgressPieComponent implements RenderableEntity
 		graphics.setStroke(drawStroke);
 		graphics.setColor(borderColor);
 		graphics.drawOval(x, y, drawDiameter, drawDiameter);
-
-		if (oldAa != null)
-		{
-			graphics.setRenderingHint(RenderingHints.KEY_ANTIALIASING, oldAa);
-		}
 
 		return new Dimension(drawDiameter, drawDiameter);
 	}

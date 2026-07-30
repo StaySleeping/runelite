@@ -61,6 +61,7 @@ import net.runelite.api.widgets.Widget;
 import net.runelite.api.widgets.WidgetItem;
 import net.runelite.client.chat.ChatMessageManager;
 import net.runelite.client.chat.QueuedMessage;
+import net.runelite.client.config.ConfigManager;
 import net.runelite.client.config.RuneLiteConfig;
 import net.runelite.client.eventbus.EventBus;
 import net.runelite.client.eventbus.Subscribe;
@@ -68,6 +69,8 @@ import net.runelite.client.events.OverlayMenuClicked;
 import net.runelite.client.input.KeyManager;
 import net.runelite.client.input.MouseAdapter;
 import net.runelite.client.input.MouseManager;
+import net.runelite.client.plugins.gpu.GpuPluginConfig;
+import net.runelite.client.plugins.gpu.config.UIScalingMode;
 import net.runelite.client.ui.ClientUI;
 import net.runelite.client.ui.JagexColors;
 import net.runelite.client.util.ColorUtil;
@@ -95,6 +98,7 @@ public class OverlayRenderer extends MouseAdapter
 	private final ChatMessageManager chatMessageManager;
 	private final SnapCorners snapCorners;
 	private final NativeOverlayBuffer nativeOverlayBuffer;
+	private final ConfigManager configManager;
 
 	private Font font, tooltipFont, interfaceFont;
 
@@ -124,7 +128,8 @@ public class OverlayRenderer extends MouseAdapter
 		final EventBus eventBus,
 		final ChatMessageManager chatMessageManager,
 		final SnapCorners snapCorners,
-		final NativeOverlayBuffer nativeOverlayBuffer
+		final NativeOverlayBuffer nativeOverlayBuffer,
+		final ConfigManager configManager
 	)
 	{
 		this.client = client;
@@ -135,6 +140,7 @@ public class OverlayRenderer extends MouseAdapter
 		this.chatMessageManager = chatMessageManager;
 		this.snapCorners = snapCorners;
 		this.nativeOverlayBuffer = nativeOverlayBuffer;
+		this.configManager = configManager;
 
 		HotkeyListener hotkeyListener = new HotkeyListener(runeLiteConfig::dragHotkey)
 		{
@@ -289,7 +295,8 @@ public class OverlayRenderer extends MouseAdapter
 			nativeOverlayBuffer.prepareFrame();
 		}
 
-		OverlayUtil.setGraphicProperties(graphics);
+		final boolean shapeAntialias = useShapeAntialias(layer);
+		OverlayUtil.setGraphicProperties(graphics, shapeAntialias);
 
 		// Cache overlay fonts once per pass
 		this.font = runeLiteConfig.dynamicOverlayFont().getFont();
@@ -321,7 +328,8 @@ public class OverlayRenderer extends MouseAdapter
 						nativeGraphics = target.createGraphics();
 						OverlayUtil.setNativeOverlayProperties(nativeGraphics,
 							nativeOverlayBuffer.getPanelContentScaleX(),
-							nativeOverlayBuffer.getPanelContentScaleY());
+							nativeOverlayBuffer.getPanelContentScaleY(),
+							shapeAntialias);
 						double sx = nativeOverlayBuffer.getScaleX();
 						double sy = nativeOverlayBuffer.getScaleY();
 						nativeGraphics.scale(sx, sy);
@@ -386,13 +394,14 @@ public class OverlayRenderer extends MouseAdapter
 						// Widget-item overlays must match stretched inventory/UI size, not Fixed overlay size.
 						if (overlay instanceof WidgetItemOverlay)
 						{
-							OverlayUtil.setNativeOverlayProperties(drawGraphics, 1.0, 1.0);
+							OverlayUtil.setNativeOverlayProperties(drawGraphics, 1.0, 1.0, shapeAntialias);
 						}
 						else
 						{
 							OverlayUtil.setNativeOverlayProperties(drawGraphics,
 								nativeOverlayBuffer.getPanelContentScaleX(),
-								nativeOverlayBuffer.getPanelContentScaleY());
+								nativeOverlayBuffer.getPanelContentScaleY(),
+								shapeAntialias);
 						}
 					}
 					safeRender(overlay, drawGraphics, location, overlayNative);
@@ -484,9 +493,26 @@ public class OverlayRenderer extends MouseAdapter
 		{
 			return false;
 		}
+		// Under GPU nearest UI scaling, UI-layer overlays ride the canvas so they share the
+		// game UI pixel grid (1 canvas px → scale² display px after nearest upscale).
+		if (isGpuUiNearest() && NativeOverlayBuffer.isAboveUiLayer(layer))
+		{
+			return false;
+		}
 		// On CPU, only post-UI layers can use the native buffer while still sitting under the bank:
 		// the software frame already merges scene+widgets, so under-UI native composites would draw on top.
 		return client.isGpu() || NativeOverlayBuffer.isAboveUiLayer(layer);
+	}
+
+	private boolean isGpuUiNearest()
+	{
+		return client.isGpu()
+			&& configManager.getConfig(GpuPluginConfig.class).uiScalingMode() == UIScalingMode.NEAREST;
+	}
+
+	private boolean useShapeAntialias(OverlayLayer layer)
+	{
+		return !(isGpuUiNearest() && NativeOverlayBuffer.isAboveUiLayer(layer));
 	}
 
 	/**
@@ -955,11 +981,12 @@ public class OverlayRenderer extends MouseAdapter
 
 	/**
 	 * Creates a Graphics2D into the above-UI native overlay buffer with stretch scale applied.
-	 * Caller must dispose. Returns null if native pass is inactive.
+	 * Caller must dispose. Returns null if native pass is inactive, or when GPU UI scaling is
+	 * nearest (flash/sidebar should ride the canvas UI buffer instead).
 	 */
 	public Graphics2D createNativeOverlayGraphics()
 	{
-		if (!nativeOverlayBuffer.isActive())
+		if (!nativeOverlayBuffer.isActive() || isGpuUiNearest())
 		{
 			return null;
 		}
@@ -972,7 +999,8 @@ public class OverlayRenderer extends MouseAdapter
 		Graphics2D g = target.createGraphics();
 		OverlayUtil.setNativeOverlayProperties(g,
 			nativeOverlayBuffer.getPanelContentScaleX(),
-			nativeOverlayBuffer.getPanelContentScaleY());
+			nativeOverlayBuffer.getPanelContentScaleY(),
+			true);
 		g.scale(nativeOverlayBuffer.getScaleX(), nativeOverlayBuffer.getScaleY());
 		return g;
 	}

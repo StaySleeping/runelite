@@ -287,7 +287,13 @@ public class OverlayUtil
 
 	public static void setGraphicProperties(Graphics2D graphics)
 	{
-		graphics.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
+		setGraphicProperties(graphics, true);
+	}
+
+	public static void setGraphicProperties(Graphics2D graphics, boolean antialias)
+	{
+		graphics.setRenderingHint(RenderingHints.KEY_ANTIALIASING,
+			antialias ? RenderingHints.VALUE_ANTIALIAS_ON : RenderingHints.VALUE_ANTIALIAS_OFF);
 	}
 
 	/**
@@ -295,7 +301,13 @@ public class OverlayUtil
 	 */
 	public static void setNativeOverlayProperties(Graphics2D graphics, double visualSizeFactorX, double visualSizeFactorY)
 	{
-		setGraphicProperties(graphics);
+		setNativeOverlayProperties(graphics, visualSizeFactorX, visualSizeFactorY, true);
+	}
+
+	public static void setNativeOverlayProperties(Graphics2D graphics, double visualSizeFactorX, double visualSizeFactorY,
+		boolean antialias)
+	{
+		setGraphicProperties(graphics, antialias);
 		graphics.setRenderingHint(KEY_NATIVE_VISUAL_SIZE_FACTOR, visualSizeFactorX);
 		graphics.setRenderingHint(KEY_NATIVE_VISUAL_SIZE_FACTOR_Y, visualSizeFactorY);
 	}
