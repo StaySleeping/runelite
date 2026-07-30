@@ -34,6 +34,8 @@ import java.awt.RenderingHints;
 import java.awt.Shape;
 import java.awt.Stroke;
 import java.awt.geom.AffineTransform;
+import java.awt.geom.Arc2D;
+import java.awt.geom.Ellipse2D;
 import java.awt.image.BufferedImage;
 import net.runelite.api.Actor;
 import net.runelite.api.Client;
@@ -107,17 +109,9 @@ public class OverlayUtil
 	}
 
 	/**
-	 * Slightly squircle-shaped (n&gt;2) so discrete rings don't grow single-pixel points
-	 * on the N/S/E/W extremities the way a pure Euclidean annulus does.
-	 */
-	private static final double PIXEL_RING_EXPONENT = 2.45;
-
-	/**
-	 * Draws a circular ring with 8-fold pixel symmetry. Prefer this over {@link Graphics2D#drawOval}
-	 * when antialiasing is off (e.g. GPU nearest UI pixel grid): stroked ovals bias top/left edges.
-	 * <p>
-	 * Size matches a {@link java.awt.BasicStroke} of {@code thickness} centered on an oval of
-	 * {@code diameter} (outer radius = diameter/2 + thickness/2).
+	 * Draws a circular ring. With antialiasing on, uses a stroked ellipse (smooth Hybrid/Linear UI).
+	 * With antialiasing off (GPU nearest UI pixel grid), paints a symmetric Euclidean annulus —
+	 * slightly smaller than a centered {@link java.awt.BasicStroke} so cardinal tips are less harsh.
 	 *
 	 * @param x top-left of the diameter×diameter oval frame (same as {@code drawOval})
 	 * @param thickness stroke width in pixels
@@ -141,27 +135,48 @@ public class OverlayUtil
 		}
 
 		thickness = Math.min(thickness, Math.max(1, diameter));
+		final boolean fullCircle = Math.abs(extentAngle) >= 360;
+
+		if (isShapeAntialiasOn(graphics))
+		{
+			final Stroke oldStroke = graphics.getStroke();
+			graphics.setStroke(new BasicStroke(thickness, BasicStroke.CAP_BUTT, BasicStroke.JOIN_MITER));
+			if (fullCircle)
+			{
+				graphics.draw(new Ellipse2D.Double(x, y, diameter, diameter));
+			}
+			else
+			{
+				graphics.draw(new Arc2D.Double(x, y, diameter, diameter, startAngle, extentAngle, Arc2D.OPEN));
+			}
+			graphics.setStroke(oldStroke);
+			return;
+		}
+
+		// Nearest / AA-off: Euclidean ring, ~0.5px smaller than stroke-centered oval
 		final double cx = x + diameter / 2.0;
 		final double cy = y + diameter / 2.0;
-		final double rMid = diameter / 2.0;
+		final double rMid = diameter / 2.0 - 0.5;
 		final double rOuter = rMid + thickness / 2.0;
 		final double rInner = Math.max(0, rMid - thickness / 2.0);
+		final double outerSq = rOuter * rOuter;
+		final double innerSq = rInner * rInner;
 		final int pad = (int) Math.ceil(thickness / 2.0);
-		final boolean fullCircle = Math.abs(extentAngle) >= 360;
 
 		for (int py = y - pad; py < y + diameter + pad; py++)
 		{
 			final double dy = py - cy;
+			final double dySq = dy * dy;
 			for (int px = x - pad; px < x + diameter + pad; px++)
 			{
 				final double dx = px - cx;
-				if (!inSuperEllipse(dx, dy, rOuter) || inSuperEllipse(dx, dy, rInner))
+				final double d2 = dx * dx + dySq;
+				if (d2 > outerSq || d2 <= innerSq)
 				{
 					continue;
 				}
 				if (!fullCircle)
 				{
-					// Screen y-down → convert to Arc2D degrees (CCW from 3 o'clock, y-up)
 					final double deg = Math.toDegrees(Math.atan2(cy - py, px - cx));
 					if (!angleOnArc(deg, startAngle, extentAngle))
 					{
@@ -173,15 +188,10 @@ public class OverlayUtil
 		}
 	}
 
-	private static boolean inSuperEllipse(double dx, double dy, double radius)
+	private static boolean isShapeAntialiasOn(Graphics2D graphics)
 	{
-		if (radius <= 0)
-		{
-			return false;
-		}
-		final double ax = Math.abs(dx) / radius;
-		final double ay = Math.abs(dy) / radius;
-		return Math.pow(ax, PIXEL_RING_EXPONENT) + Math.pow(ay, PIXEL_RING_EXPONENT) <= 1.0;
+		Object hint = graphics.getRenderingHint(RenderingHints.KEY_ANTIALIASING);
+		return hint != RenderingHints.VALUE_ANTIALIAS_OFF;
 	}
 
 	/**
