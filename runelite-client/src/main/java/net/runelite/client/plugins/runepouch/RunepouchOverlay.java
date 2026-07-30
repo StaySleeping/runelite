@@ -172,9 +172,7 @@ class RunepouchOverlay extends WidgetItemOverlay
 			}
 
 			final String tooltip = tooltipBuilder.toString();
-			final Tooltip t = new Tooltip(tooltip);
-			t.setScaleWithOverlays(true);
-			tooltipManager.add(t);
+			tooltipManager.add(new Tooltip(tooltip));
 		}
 	}
 

@@ -142,9 +142,7 @@ public class ItemStatOverlay extends Overlay
 
 				if (!tooltip.isEmpty())
 				{
-					final Tooltip t = new Tooltip(tooltip);
-					t.setScaleWithOverlays(true);
-					tooltipManager.add(t);
+					tooltipManager.add(new Tooltip(tooltip));
 				}
 			}
 
@@ -183,9 +181,7 @@ public class ItemStatOverlay extends Overlay
 					}
 				}
 
-				final Tooltip durationTooltip = new Tooltip(sb.toString());
-				durationTooltip.setScaleWithOverlays(true);
-				tooltipManager.add(durationTooltip);
+				tooltipManager.add(new Tooltip(sb.toString()));
 			}
 		}
 
@@ -199,9 +195,7 @@ public class ItemStatOverlay extends Overlay
 
 				if (!tooltip.isEmpty())
 				{
-					final Tooltip t = new Tooltip(tooltip);
-					t.setScaleWithOverlays(true);
-					tooltipManager.add(t);
+					tooltipManager.add(new Tooltip(tooltip));
 				}
 			}
 		}

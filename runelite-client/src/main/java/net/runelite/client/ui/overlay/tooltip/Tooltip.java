@@ -33,9 +33,10 @@ public class Tooltip
 	private String text;
 	private LayoutableRenderableEntity component;
 	/**
-	 * When true and native resolution overlays is active, draw at the interface overlay content scale.
+	 * When true and native resolution overlays is active, draw at the interface overlay content scale
+	 * (Fixed overlay size cancels stretch). Defaults on; Mouse Highlight can opt out via its config.
 	 */
-	private boolean scaleWithOverlays;
+	private boolean scaleWithOverlays = true;
 
 	public Tooltip(final String text)
 	{

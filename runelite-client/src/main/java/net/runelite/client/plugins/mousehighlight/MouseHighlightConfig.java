@@ -68,7 +68,7 @@ public interface MouseHighlightConfig extends Config
 		position = 3,
 		keyName = "scaleTooltips",
 		name = "Scale tooltips",
-		description = "When stretched mode is on, size mouse tooltips using Stretched Mode's overlay sizing (including Fixed overlay size)."
+		description = "When stretched mode is on, size mouse tooltips using Stretched Mode's overlay sizing (including Fixed overlay size). Turn off to keep the old stretch-large tip size."
 	)
 	default boolean scaleTooltips()
 	{
