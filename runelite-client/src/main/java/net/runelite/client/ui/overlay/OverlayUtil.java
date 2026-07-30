@@ -126,9 +126,10 @@ public class OverlayUtil
 
 		int x = txtLoc.getX();
 		int y = txtLoc.getY();
+		float shadow = (float) getNativeVisualSizeFactor(graphics);
 
 		graphics.setColor(Color.BLACK);
-		graphics.drawString(text, x + 1, y + 1);
+		graphics.drawString(text, x + shadow, y + shadow);
 
 		graphics.setColor(ColorUtil.colorWithAlpha(color, 0xFF));
 		graphics.drawString(text, x, y);

@@ -97,10 +97,16 @@ public class TooltipOverlay extends Overlay
 		final int canvasHeight = client.getCanvasHeight();
 		final net.runelite.api.Point mouseCanvasPosition = client.getMouseCanvasPosition();
 
+		// UNDER_OFFSET is display-space padding; under native stretch the transform would
+		// amplify it while the OS cursor stays display-sized.
+		final int underOffset = nativeOverlayBuffer.isActive()
+			? (int) Math.round(UNDER_OFFSET / nativeOverlayBuffer.getScaleY())
+			: UNDER_OFFSET;
+
 		final int tooltipX = Math.min(canvasWidth - prevWidth, mouseCanvasPosition.getX());
 		final int tooltipY = runeLiteConfig.tooltipPosition() == TooltipPositionType.ABOVE_CURSOR
 			? Math.max(0, mouseCanvasPosition.getY() - prevHeight)
-			: Math.min(canvasHeight - prevHeight, mouseCanvasPosition.getY() + UNDER_OFFSET);
+			: Math.min(canvasHeight - prevHeight, mouseCanvasPosition.getY() + underOffset);
 
 		final AffineTransform transform = graphics.getTransform();
 		int width = 0, height = 0;

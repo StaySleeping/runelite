@@ -381,6 +381,20 @@ public class OverlayRenderer extends MouseAdapter
 				boolean previousNative = OverlayUtil.setCurrentOverlayNative(overlayNative);
 				try
 				{
+					if (overlayNative)
+					{
+						// Widget-item overlays must match stretched inventory/UI size, not Fixed overlay size.
+						if (overlay instanceof WidgetItemOverlay)
+						{
+							OverlayUtil.setNativeOverlayProperties(drawGraphics, 1.0, 1.0);
+						}
+						else
+						{
+							OverlayUtil.setNativeOverlayProperties(drawGraphics,
+								nativeOverlayBuffer.getPanelContentScaleX(),
+								nativeOverlayBuffer.getPanelContentScaleY());
+						}
+					}
 					safeRender(overlay, drawGraphics, location, overlayNative);
 				}
 				finally
@@ -877,7 +891,7 @@ public class OverlayRenderer extends MouseAdapter
 		// Set font based on configuration
 		if (position == OverlayPosition.DYNAMIC || position == OverlayPosition.DETACHED)
 		{
-			if (nativePass)
+			if (nativePass && !(overlay instanceof WidgetItemOverlay))
 			{
 				// Fixed overlay size: cancel stretch on glyphs. Otherwise keep full size.
 				float factor = (float) nativeOverlayBuffer.getPanelContentScaleX();
