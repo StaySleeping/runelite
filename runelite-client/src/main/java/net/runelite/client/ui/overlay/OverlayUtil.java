@@ -110,8 +110,8 @@ public class OverlayUtil
 
 	/**
 	 * Draws a circular ring. With antialiasing on, uses a stroked ellipse (smooth Hybrid/Linear UI).
-	 * With antialiasing off (GPU nearest UI pixel grid), paints a symmetric annulus —
-	 * slightly smaller than a centered stroke, with horizontal radii inset so L/R tips flatten.
+	 * With antialiasing off (GPU nearest UI pixel grid), paints a symmetric Euclidean annulus —
+	 * slightly smaller than a centered {@link java.awt.BasicStroke}.
 	 *
 	 * @param x top-left of the diameter×diameter oval frame (same as {@code drawOval})
 	 * @param thickness stroke width in pixels
@@ -143,47 +143,35 @@ public class OverlayUtil
 			graphics.setStroke(new BasicStroke(thickness, BasicStroke.CAP_BUTT, BasicStroke.JOIN_MITER));
 			if (fullCircle)
 			{
-				graphics.draw(new Ellipse2D.Double(x - 0.5, y, diameter, diameter));
+				graphics.draw(new Ellipse2D.Double(x - 0.5, y - 0.5, diameter, diameter));
 			}
 			else
 			{
-				graphics.draw(new Arc2D.Double(x - 0.5, y, diameter, diameter, startAngle, extentAngle, Arc2D.OPEN));
+				graphics.draw(new Arc2D.Double(x - 0.5, y - 0.5, diameter, diameter, startAngle, extentAngle, Arc2D.OPEN));
 			}
 			graphics.setStroke(oldStroke);
 			return;
 		}
 
-		// Nearest / AA-off: Euclidean ring, ~0.5px smaller than stroke-centered oval.
-		// Horizontal radii are inset another 0.5px so L/R don't end in a single tip pixel.
+		// Nearest / AA-off: Euclidean ring, ~0.5px smaller than stroke-centered oval
 		final double cx = x + diameter / 2.0 - 0.5;
-		final double cy = y + diameter / 2.0;
+		final double cy = y + diameter / 2.0 - 0.5;
 		final double rMid = diameter / 2.0 - 0.5;
 		final double rOuter = rMid + thickness / 2.0;
 		final double rInner = Math.max(0, rMid - thickness / 2.0);
-		final double rOuterX = Math.max(0.5, rOuter - 0.5);
-		final double rOuterY = rOuter;
-		final double rInnerX = Math.max(0, rInner - 0.5);
-		final double rInnerY = rInner;
-		final double outerXSq = rOuterX * rOuterX;
-		final double outerYSq = rOuterY * rOuterY;
-		final double innerXSq = rInnerX * rInnerX;
-		final double innerYSq = rInnerY * rInnerY;
+		final double outerSq = rOuter * rOuter;
+		final double innerSq = rInner * rInner;
 		final int pad = (int) Math.ceil(thickness / 2.0);
 
-		for (int py = y - pad; py < y + diameter + pad; py++)
+		for (int py = y - pad - 1; py < y + diameter + pad; py++)
 		{
 			final double dy = py - cy;
 			final double dySq = dy * dy;
-			for (int px = x - pad; px < x + diameter + pad; px++)
+			for (int px = x - pad - 1; px < x + diameter + pad; px++)
 			{
 				final double dx = px - cx;
-				final double dxSq = dx * dx;
-				if (dxSq / outerXSq + dySq / outerYSq > 1.0)
-				{
-					continue;
-				}
-				if (rInner > 0 && innerXSq > 0 && innerYSq > 0
-					&& dxSq / innerXSq + dySq / innerYSq <= 1.0)
+				final double d2 = dx * dx + dySq;
+				if (d2 > outerSq || d2 <= innerSq)
 				{
 					continue;
 				}
