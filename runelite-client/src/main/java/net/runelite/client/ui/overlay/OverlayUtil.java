@@ -107,6 +107,12 @@ public class OverlayUtil
 	}
 
 	/**
+	 * Slightly squircle-shaped (n&gt;2) so discrete rings don't grow single-pixel points
+	 * on the N/S/E/W extremities the way a pure Euclidean annulus does.
+	 */
+	private static final double PIXEL_RING_EXPONENT = 2.45;
+
+	/**
 	 * Draws a circular ring with 8-fold pixel symmetry. Prefer this over {@link Graphics2D#drawOval}
 	 * when antialiasing is off (e.g. GPU nearest UI pixel grid): stroked ovals bias top/left edges.
 	 * <p>
@@ -140,20 +146,16 @@ public class OverlayUtil
 		final double rMid = diameter / 2.0;
 		final double rOuter = rMid + thickness / 2.0;
 		final double rInner = Math.max(0, rMid - thickness / 2.0);
-		final double outerSq = rOuter * rOuter;
-		final double innerSq = rInner * rInner;
 		final int pad = (int) Math.ceil(thickness / 2.0);
 		final boolean fullCircle = Math.abs(extentAngle) >= 360;
 
 		for (int py = y - pad; py < y + diameter + pad; py++)
 		{
 			final double dy = py - cy;
-			final double dySq = dy * dy;
 			for (int px = x - pad; px < x + diameter + pad; px++)
 			{
 				final double dx = px - cx;
-				final double d2 = dx * dx + dySq;
-				if (d2 > outerSq || d2 <= innerSq)
+				if (!inSuperEllipse(dx, dy, rOuter) || inSuperEllipse(dx, dy, rInner))
 				{
 					continue;
 				}
@@ -169,6 +171,17 @@ public class OverlayUtil
 				graphics.fillRect(px, py, 1, 1);
 			}
 		}
+	}
+
+	private static boolean inSuperEllipse(double dx, double dy, double radius)
+	{
+		if (radius <= 0)
+		{
+			return false;
+		}
+		final double ax = Math.abs(dx) / radius;
+		final double ay = Math.abs(dy) / radius;
+		return Math.pow(ax, PIXEL_RING_EXPONENT) + Math.pow(ay, PIXEL_RING_EXPONENT) <= 1.0;
 	}
 
 	/**
