@@ -109,6 +109,14 @@ public abstract class Overlay implements LayoutableRenderableEntity
 	@Setter(AccessLevel.PROTECTED)
 	private boolean preferNativeResolution = true;
 
+	/**
+	 * When GPU UI scaling is nearest neighbor, draw this overlay on the canvas/UI
+	 * buffer so 2D shapes share the game UI pixel grid. Opt in only for geometry
+	 * overlays (orb rings, arcs); leave text/panels on the native path.
+	 */
+	@Setter(AccessLevel.PROTECTED)
+	private boolean preferUiPixelGrid;
+
 	protected Overlay()
 	{
 		plugin = null;

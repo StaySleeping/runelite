@@ -70,6 +70,7 @@ class PrayerDoseOverlay extends Overlay
 		this.config = config;
 		setPosition(OverlayPosition.DYNAMIC);
 		setLayer(OverlayLayer.ABOVE_WIDGETS);
+		setPreferUiPixelGrid(true);
 	}
 
 	void onTick()

@@ -295,8 +295,7 @@ public class OverlayRenderer extends MouseAdapter
 			nativeOverlayBuffer.prepareFrame();
 		}
 
-		final boolean shapeAntialias = useShapeAntialias(layer);
-		OverlayUtil.setGraphicProperties(graphics, shapeAntialias);
+		OverlayUtil.setGraphicProperties(graphics, true);
 
 		// Cache overlay fonts once per pass
 		this.font = runeLiteConfig.dynamicOverlayFont().getFont();
@@ -313,6 +312,9 @@ public class OverlayRenderer extends MouseAdapter
 			for (Overlay overlay : overlays)
 			{
 				final boolean overlayNative = shouldUseNativePass(overlay, layer);
+				final boolean shapeAntialias = overlayNative
+					|| !overlay.isPreferUiPixelGrid()
+					|| !isGpuUiNearest();
 				final Graphics2D drawGraphics;
 
 				if (overlayNative)
@@ -329,7 +331,7 @@ public class OverlayRenderer extends MouseAdapter
 						OverlayUtil.setNativeOverlayProperties(nativeGraphics,
 							nativeOverlayBuffer.getPanelContentScaleX(),
 							nativeOverlayBuffer.getPanelContentScaleY(),
-							shapeAntialias);
+							true);
 						double sx = nativeOverlayBuffer.getScaleX();
 						double sy = nativeOverlayBuffer.getScaleY();
 						nativeGraphics.scale(sx, sy);
@@ -339,6 +341,7 @@ public class OverlayRenderer extends MouseAdapter
 				}
 				else
 				{
+					OverlayUtil.setGraphicProperties(graphics, shapeAntialias);
 					drawGraphics = graphics;
 				}
 
@@ -394,14 +397,14 @@ public class OverlayRenderer extends MouseAdapter
 						// Widget-item overlays must match stretched inventory/UI size, not Fixed overlay size.
 						if (overlay instanceof WidgetItemOverlay)
 						{
-							OverlayUtil.setNativeOverlayProperties(drawGraphics, 1.0, 1.0, shapeAntialias);
+							OverlayUtil.setNativeOverlayProperties(drawGraphics, 1.0, 1.0, true);
 						}
 						else
 						{
 							OverlayUtil.setNativeOverlayProperties(drawGraphics,
 								nativeOverlayBuffer.getPanelContentScaleX(),
 								nativeOverlayBuffer.getPanelContentScaleY(),
-								shapeAntialias);
+								true);
 						}
 					}
 					safeRender(overlay, drawGraphics, location, overlayNative);
@@ -493,9 +496,9 @@ public class OverlayRenderer extends MouseAdapter
 		{
 			return false;
 		}
-		// Under GPU nearest UI scaling, UI-layer overlays ride the canvas so they share the
-		// game UI pixel grid (1 canvas px → scale² display px after nearest upscale).
-		if (isGpuUiNearest() && NativeOverlayBuffer.isAboveUiLayer(layer))
+		// Geometry overlays that opt into UI pixel grid ride the canvas under GPU nearest
+		// so shapes share the game UI texel grid (1 canvas px → scale² display px).
+		if (isGpuUiNearest() && overlay.isPreferUiPixelGrid())
 		{
 			return false;
 		}
@@ -508,11 +511,6 @@ public class OverlayRenderer extends MouseAdapter
 	{
 		return client.isGpu()
 			&& configManager.getConfig(GpuPluginConfig.class).uiScalingMode() == UIScalingMode.NEAREST;
-	}
-
-	private boolean useShapeAntialias(OverlayLayer layer)
-	{
-		return !(isGpuUiNearest() && NativeOverlayBuffer.isAboveUiLayer(layer));
 	}
 
 	/**
@@ -981,12 +979,11 @@ public class OverlayRenderer extends MouseAdapter
 
 	/**
 	 * Creates a Graphics2D into the above-UI native overlay buffer with stretch scale applied.
-	 * Caller must dispose. Returns null if native pass is inactive, or when GPU UI scaling is
-	 * nearest (flash/sidebar should ride the canvas UI buffer instead).
+	 * Caller must dispose. Returns null if native pass is inactive.
 	 */
 	public Graphics2D createNativeOverlayGraphics()
 	{
-		if (!nativeOverlayBuffer.isActive() || isGpuUiNearest())
+		if (!nativeOverlayBuffer.isActive())
 		{
 			return null;
 		}

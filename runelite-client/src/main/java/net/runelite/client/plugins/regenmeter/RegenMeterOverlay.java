@@ -64,6 +64,7 @@ class RegenMeterOverlay extends Overlay
 	{
 		setPosition(OverlayPosition.DYNAMIC);
 		setLayer(OverlayLayer.ABOVE_WIDGETS);
+		setPreferUiPixelGrid(true);
 		this.client = client;
 		this.plugin = plugin;
 		this.config = config;
