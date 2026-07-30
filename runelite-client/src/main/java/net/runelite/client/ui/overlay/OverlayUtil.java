@@ -143,18 +143,18 @@ public class OverlayUtil
 			graphics.setStroke(new BasicStroke(thickness, BasicStroke.CAP_BUTT, BasicStroke.JOIN_MITER));
 			if (fullCircle)
 			{
-				graphics.draw(new Ellipse2D.Double(x - 0.25, y, diameter, diameter));
+				graphics.draw(new Ellipse2D.Double(x - 1, y, diameter, diameter));
 			}
 			else
 			{
-				graphics.draw(new Arc2D.Double(x - 0.25, y, diameter, diameter, startAngle, extentAngle, Arc2D.OPEN));
+				graphics.draw(new Arc2D.Double(x - 1, y, diameter, diameter, startAngle, extentAngle, Arc2D.OPEN));
 			}
 			graphics.setStroke(oldStroke);
 			return;
 		}
 
 		// Nearest / AA-off: Euclidean ring, ~0.5px smaller than stroke-centered oval
-		final double cx = x + diameter / 2.0 - 0.25;
+		final double cx = x + diameter / 2.0 - 1;
 		final double cy = y + diameter / 2.0;
 		final double rMid = diameter / 2.0 - 0.5;
 		final double rOuter = rMid + thickness / 2.0;
