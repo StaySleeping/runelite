@@ -62,6 +62,8 @@ public class NativeOverlayMenu
 {
 	/** Extra capture pad so flyout submenus beside the root are included. */
 	private static final int SUBMENU_CAPTURE_PAD = 280;
+	/** Canvas pixels within this of an edge count as client-clamped flush. */
+	private static final int EDGE_FLUSH_TOLERANCE = 1;
 
 	private final Client client;
 	private final NativeOverlayBuffer nativeOverlayBuffer;
@@ -235,7 +237,9 @@ public class NativeOverlayMenu
 			nativeOverlayBuffer.getScaleX(),
 			nativeOverlayBuffer.getScaleY(),
 			nativeOverlayBuffer.fixedMenuSize(),
-			nativeOverlayBuffer.fixedMenuAspectRatio());
+			nativeOverlayBuffer.fixedMenuAspectRatio(),
+			canvasW,
+			canvasH);
 
 		clearDeferredMenu();
 		return image;
@@ -298,9 +302,11 @@ public class NativeOverlayMenu
 
 		final double sx = nativeOverlayBuffer.getScaleX();
 		final double sy = nativeOverlayBuffer.getScaleY();
-		final Rectangle rootDest = computeMenuDest(root, sx, sy, fixedSize, fixedAspect);
+		final int canvasW = client.getCanvasWidth();
+		final int canvasH = client.getCanvasHeight();
+		final Rectangle rootDest = computeMenuDest(root, sx, sy, fixedSize, fixedAspect, canvasW, canvasH);
 		final Rectangle visualHit = mapCanvasRectFromAnchor(hit, root, rootDest);
-		final Rectangle defaultHitDest = computeMenuDest(hit, sx, sy, false, false);
+		final Rectangle defaultHitDest = computeMenuDest(hit, sx, sy, false, false, canvasW, canvasH);
 		if (visualHit.equals(defaultHitDest))
 		{
 			return null;
@@ -328,8 +334,9 @@ public class NativeOverlayMenu
 
 	/**
 	 * Stretched-space destination for a canvas-space menu rectangle.
-	 * Fixed size centers on the stretched menu center in X (client click anchor) and
-	 * top-aligns in Y. With aspect off, fixed size keeps window aspect at {@code min(sx,sy)} size.
+	 * Fixed size/aspect center on the menu (X) / top-align (Y), but if the client already
+	 * clamped the menu to a canvas edge, pin that edge in stretched space so a smaller
+	 * dest does not leave a gap.
 	 */
 	public static Rectangle computeMenuDest(
 		Rectangle menu,
@@ -338,23 +345,35 @@ public class NativeOverlayMenu
 		boolean fixedSize,
 		boolean fixedAspect)
 	{
+		return computeMenuDest(menu, scaleX, scaleY, fixedSize, fixedAspect, 0, 0);
+	}
+
+	public static Rectangle computeMenuDest(
+		Rectangle menu,
+		double scaleX,
+		double scaleY,
+		boolean fixedSize,
+		boolean fixedAspect,
+		int canvasWidth,
+		int canvasHeight)
+	{
 		final double s = Math.min(scaleX == 0 ? 1 : scaleX, scaleY == 0 ? 1 : scaleY);
 
 		if (fixedSize && fixedAspect)
 		{
-			final double cx = (menu.x + menu.width / 2.0) * scaleX;
-			final int dx = (int) Math.round(cx - menu.width / 2.0);
-			final int dy = (int) Math.round(menu.y * scaleY);
-			return new Rectangle(dx, dy, menu.width, menu.height);
+			final int dw = menu.width;
+			final int dh = menu.height;
+			final int dx = destPosCentered(menu.x, menu.width, dw, scaleX, canvasWidth);
+			final int dy = destPosTopAligned(menu.y, menu.height, dh, scaleY, canvasHeight);
+			return new Rectangle(dx, dy, dw, dh);
 		}
 
 		if (fixedSize)
 		{
 			final int dw = Math.max(1, (int) Math.round(menu.width * scaleX / s));
 			final int dh = Math.max(1, (int) Math.round(menu.height * scaleY / s));
-			final double cx = (menu.x + menu.width / 2.0) * scaleX;
-			final int dx = (int) Math.round(cx - dw / 2.0);
-			final int dy = (int) Math.round(menu.y * scaleY);
+			final int dx = destPosCentered(menu.x, menu.width, dw, scaleX, canvasWidth);
+			final int dy = destPosTopAligned(menu.y, menu.height, dh, scaleY, canvasHeight);
 			return new Rectangle(dx, dy, dw, dh);
 		}
 
@@ -362,10 +381,8 @@ public class NativeOverlayMenu
 		{
 			final int dw = Math.max(1, (int) Math.round(menu.width * s));
 			final int dh = Math.max(1, (int) Math.round(menu.height * s));
-			final double cx = (menu.x + menu.width / 2.0) * scaleX;
-			final double cy = (menu.y + menu.height / 2.0) * scaleY;
-			final int dx = (int) Math.round(cx - dw / 2.0);
-			final int dy = (int) Math.round(cy - dh / 2.0);
+			final int dx = destPosCentered(menu.x, menu.width, dw, scaleX, canvasWidth);
+			final int dy = destPosCentered(menu.y, menu.height, dh, scaleY, canvasHeight);
 			return new Rectangle(dx, dy, dw, dh);
 		}
 
@@ -388,12 +405,25 @@ public class NativeOverlayMenu
 		boolean fixedSize,
 		boolean fixedAspect)
 	{
+		return computeCaptureDest(capture, anchor, scaleX, scaleY, fixedSize, fixedAspect, 0, 0);
+	}
+
+	public static Rectangle computeCaptureDest(
+		Rectangle capture,
+		Rectangle anchor,
+		double scaleX,
+		double scaleY,
+		boolean fixedSize,
+		boolean fixedAspect,
+		int canvasWidth,
+		int canvasHeight)
+	{
 		if (!fixedSize && !fixedAspect)
 		{
-			return computeMenuDest(capture, scaleX, scaleY, false, false);
+			return computeMenuDest(capture, scaleX, scaleY, false, false, canvasWidth, canvasHeight);
 		}
 
-		final Rectangle anchorDest = computeMenuDest(anchor, scaleX, scaleY, fixedSize, fixedAspect);
+		final Rectangle anchorDest = computeMenuDest(anchor, scaleX, scaleY, fixedSize, fixedAspect, canvasWidth, canvasHeight);
 		return mapCanvasRectFromAnchor(capture, anchor, anchorDest);
 	}
 
@@ -410,6 +440,69 @@ public class NativeOverlayMenu
 		final int dw = Math.max(1, (int) Math.round(canvasRect.width * contentScaleX));
 		final int dh = Math.max(1, (int) Math.round(canvasRect.height * contentScaleY));
 		return new Rectangle(dx, dy, dw, dh);
+	}
+
+	private static int destPosCentered(int menuPos, int menuSize, int destSize, double scale, int canvasSize)
+	{
+		final int stretched = canvasSize > 0
+			? Math.max(destSize, (int) Math.round(canvasSize * scale))
+			: Integer.MAX_VALUE / 4;
+		final boolean flushStart = canvasSize > 0 && menuPos <= EDGE_FLUSH_TOLERANCE;
+		final boolean flushEnd = canvasSize > 0 && menuPos + menuSize >= canvasSize - EDGE_FLUSH_TOLERANCE;
+		int pos;
+		if (flushEnd && !flushStart)
+		{
+			pos = stretched - destSize;
+		}
+		else if (flushStart && !flushEnd)
+		{
+			pos = 0;
+		}
+		else
+		{
+			pos = (int) Math.round((menuPos + menuSize / 2.0) * scale - destSize / 2.0);
+		}
+		if (canvasSize > 0)
+		{
+			if (pos + destSize > stretched)
+			{
+				pos = stretched - destSize;
+			}
+			if (pos < 0)
+			{
+				pos = 0;
+			}
+		}
+		return pos;
+	}
+
+	private static int destPosTopAligned(int menuPos, int menuSize, int destSize, double scale, int canvasSize)
+	{
+		final int stretched = canvasSize > 0
+			? Math.max(destSize, (int) Math.round(canvasSize * scale))
+			: Integer.MAX_VALUE / 4;
+		final boolean flushEnd = canvasSize > 0 && menuPos + menuSize >= canvasSize - EDGE_FLUSH_TOLERANCE;
+		int pos;
+		if (flushEnd)
+		{
+			pos = stretched - destSize;
+		}
+		else
+		{
+			pos = (int) Math.round(menuPos * scale);
+		}
+		if (canvasSize > 0)
+		{
+			if (pos + destSize > stretched)
+			{
+				pos = stretched - destSize;
+			}
+			if (pos < 0)
+			{
+				pos = 0;
+			}
+		}
+		return pos;
 	}
 
 	/**

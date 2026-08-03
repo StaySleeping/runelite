@@ -78,6 +78,17 @@ public class NativeOverlayMenuTest
 	}
 
 	@Test
+	public void computeMenuDest_fixedSizeFlushRight()
+	{
+		// Client clamped menu to canvas right edge (800). Smaller dest must pin flush right.
+		Rectangle menu = new Rectangle(700, 20, 100, 50);
+		Rectangle dest = NativeOverlayMenu.computeMenuDest(menu, 2.0, 2.0, true, true, 800, 600);
+		assertEquals(1500, dest.x);
+		assertEquals(100, dest.width);
+		assertEquals(1600, dest.x + dest.width);
+	}
+
+	@Test
 	public void computeCaptureDest_defaultUsesCaptureBounds()
 	{
 		Rectangle capture = new Rectangle(0, 10, 200, 80);
