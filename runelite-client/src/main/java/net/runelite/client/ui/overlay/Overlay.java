@@ -117,6 +117,13 @@ public abstract class Overlay implements LayoutableRenderableEntity
 	@Setter(AccessLevel.PROTECTED)
 	private boolean preferUiPixelGrid;
 
+	/**
+	 * DYNAMIC overlays that should follow Fixed overlay size / aspect ratio like
+	 * infoboxes (e.g. FPS and ping counters), instead of world-overlay scaling.
+	 */
+	@Setter(AccessLevel.PROTECTED)
+	private boolean preferPanelContentScale;
+
 	protected Overlay()
 	{
 		plugin = null;

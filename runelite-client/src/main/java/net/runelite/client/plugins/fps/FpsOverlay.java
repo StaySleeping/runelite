@@ -67,6 +67,7 @@ public class FpsOverlay extends Overlay
 		setLayer(OverlayLayer.ABOVE_WIDGETS);
 		setPriority(PRIORITY_HIGH);
 		setPosition(OverlayPosition.DYNAMIC);
+		setPreferPanelContentScale(true);
 		setPreferNativeResolution(config.scaleWithNativeOverlays());
 	}
 

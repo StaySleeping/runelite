@@ -71,6 +71,7 @@ class WorldHopperPingOverlay extends Overlay
 		setLayer(OverlayLayer.ABOVE_WIDGETS);
 		setPriority(PRIORITY_HIGH);
 		setPosition(OverlayPosition.DYNAMIC);
+		setPreferPanelContentScale(true);
 		setPreferNativeResolution(worldHopperConfig.scaleWithNativeOverlays());
 	}
 

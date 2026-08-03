@@ -395,10 +395,18 @@ public class OverlayRenderer extends MouseAdapter
 					if (overlayNative)
 					{
 						// Widget-item overlays must match stretched inventory/UI size.
-						// DYNAMIC/world overlays only honour fixed overlay size (not aspect).
+						// World DYNAMIC overlays only honour fixed overlay size (not aspect).
+						// HUD DYNAMIC overlays (FPS/ping) opt into panel size/aspect scaling.
 						if (overlay instanceof WidgetItemOverlay)
 						{
 							OverlayUtil.setNativeOverlayProperties(drawGraphics, 1.0, 1.0, true);
+						}
+						else if (overlay.isPreferPanelContentScale())
+						{
+							OverlayUtil.setNativeOverlayProperties(drawGraphics,
+								nativeOverlayBuffer.getPanelContentScaleX(),
+								nativeOverlayBuffer.getPanelContentScaleY(),
+								true);
 						}
 						else if (overlayPosition == OverlayPosition.DYNAMIC || overlayPosition == OverlayPosition.DETACHED)
 						{
@@ -924,10 +932,10 @@ public class OverlayRenderer extends MouseAdapter
 		// Set font based on configuration
 		if (position == OverlayPosition.DYNAMIC || position == OverlayPosition.DETACHED)
 		{
-			if (nativePass && !(overlay instanceof WidgetItemOverlay))
+			if (nativePass && !(overlay instanceof WidgetItemOverlay) && !overlay.isPreferPanelContentScale())
 			{
-				// Fixed overlay size: cancel stretch on glyphs. Aspect correction is panels-only.
-				float factor = (float) nativeOverlayBuffer.getFixedSizeContentScaleX();
+				// World DYNAMIC: fixed overlay size cancels stretch on glyphs only.
+				final float factor = (float) nativeOverlayBuffer.getFixedSizeContentScaleX();
 				if (factor != 1.0f)
 				{
 					graphics.setFont(font.deriveFont(font.getSize2D() * factor));
@@ -939,6 +947,7 @@ public class OverlayRenderer extends MouseAdapter
 			}
 			else
 			{
+				// Including preferPanelContentScale HUD: font scales via graphics.scale below.
 				graphics.setFont(font);
 			}
 		}
@@ -953,7 +962,8 @@ public class OverlayRenderer extends MouseAdapter
 
 		graphics.translate(point.x, point.y);
 
-		if (nativePass && position != OverlayPosition.DYNAMIC && position != OverlayPosition.TOOLTIP)
+		if (nativePass && (overlay.isPreferPanelContentScale()
+			|| (position != OverlayPosition.DYNAMIC && position != OverlayPosition.TOOLTIP)))
 		{
 			double cx = nativeOverlayBuffer.getPanelContentScaleX();
 			double cy = nativeOverlayBuffer.getPanelContentScaleY();
