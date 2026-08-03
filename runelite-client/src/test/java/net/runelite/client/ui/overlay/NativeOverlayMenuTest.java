@@ -47,17 +47,18 @@ public class NativeOverlayMenuTest
 	}
 
 	@Test
-	public void computeMenuDest_fixedSize()
+	public void computeMenuDest_fixedSizeCentersX()
 	{
+		// Stretched center X = (40+50)*3 = 270; dest left = 270 - 50 = 220; top = 20*2 = 40
 		Rectangle dest = NativeOverlayMenu.computeMenuDest(MENU, 3.0, 2.0, true, false);
-		assertEquals(new Rectangle(120, 40, 100, 50), dest);
+		assertEquals(new Rectangle(220, 40, 100, 50), dest);
 	}
 
 	@Test
 	public void computeMenuDest_fixedSizeIgnoresAspectFlag()
 	{
 		Rectangle dest = NativeOverlayMenu.computeMenuDest(MENU, 3.0, 2.0, true, true);
-		assertEquals(new Rectangle(120, 40, 100, 50), dest);
+		assertEquals(new Rectangle(220, 40, 100, 50), dest);
 	}
 
 	@Test
@@ -74,5 +75,30 @@ public class NativeOverlayMenuTest
 		Rectangle def = NativeOverlayMenu.computeMenuDest(MENU, 2.0, 2.0, false, false);
 		Rectangle aspect = NativeOverlayMenu.computeMenuDest(MENU, 2.0, 2.0, false, true);
 		assertEquals(def, aspect);
+	}
+
+	@Test
+	public void computeCaptureDest_defaultUsesCaptureBounds()
+	{
+		Rectangle capture = new Rectangle(0, 10, 200, 80);
+		Rectangle tight = new Rectangle(40, 20, 100, 50);
+		Rectangle dest = NativeOverlayMenu.computeCaptureDest(capture, tight, 2.0, 2.0, false, false);
+		assertEquals(NativeOverlayMenu.computeMenuDest(capture, 2.0, 2.0, false, false), dest);
+	}
+
+	@Test
+	public void computeCaptureDest_fixedSizeKeepsTightAnchorWithPad()
+	{
+		Rectangle capture = new Rectangle(0, 10, 200, 80);
+		Rectangle tight = new Rectangle(40, 20, 100, 50);
+		Rectangle dest = NativeOverlayMenu.computeCaptureDest(capture, tight, 3.0, 2.0, true, false);
+		Rectangle tightDest = NativeOverlayMenu.computeMenuDest(tight, 3.0, 2.0, true, false);
+		// Pad left of tight = 40; content scale = 1 → dest.x = tightDest.x - 40
+		assertEquals(tightDest.x - 40, dest.x);
+		assertEquals(tightDest.y - 10, dest.y);
+		assertEquals(200, dest.width);
+		assertEquals(80, dest.height);
+		// Menu pixels at offset 40 in the crop land on tightDest.x
+		assertEquals(tightDest.x, dest.x + 40);
 	}
 }

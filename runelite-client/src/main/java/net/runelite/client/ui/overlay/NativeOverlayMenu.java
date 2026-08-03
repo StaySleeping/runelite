@@ -227,8 +227,10 @@ public class NativeOverlayMenu
 		}
 
 		lastCaptureBounds = new Rectangle(menu);
-		lastCaptureDest = computeMenuDest(
+		final Rectangle tight = getTightMenuBounds(client);
+		lastCaptureDest = computeCaptureDest(
 			menu,
+			tight != null ? tight : menu,
 			nativeOverlayBuffer.getScaleX(),
 			nativeOverlayBuffer.getScaleY(),
 			nativeOverlayBuffer.fixedMenuSize(),
@@ -322,6 +324,8 @@ public class NativeOverlayMenu
 
 	/**
 	 * Stretched-space destination for a canvas-space menu rectangle.
+	 * Fixed size centers on the stretched menu center in X (client click anchor) and
+	 * top-aligns in Y.
 	 */
 	public static Rectangle computeMenuDest(
 		Rectangle menu,
@@ -332,7 +336,8 @@ public class NativeOverlayMenu
 	{
 		if (fixedSize)
 		{
-			final int dx = (int) Math.round(menu.x * scaleX);
+			final double cx = (menu.x + menu.width / 2.0) * scaleX;
+			final int dx = (int) Math.round(cx - menu.width / 2.0);
 			final int dy = (int) Math.round(menu.y * scaleY);
 			return new Rectangle(dx, dy, menu.width, menu.height);
 		}
@@ -353,6 +358,35 @@ public class NativeOverlayMenu
 		final int dy = (int) Math.round(menu.y * scaleY);
 		final int dw = Math.max(1, (int) Math.round(menu.width * scaleX));
 		final int dh = Math.max(1, (int) Math.round(menu.height * scaleY));
+		return new Rectangle(dx, dy, dw, dh);
+	}
+
+	/**
+	 * Dest for a padded capture crop so the tight menu stays correctly anchored
+	 * under fixed size / aspect (pad must not shift content left/right).
+	 */
+	public static Rectangle computeCaptureDest(
+		Rectangle capture,
+		Rectangle tight,
+		double scaleX,
+		double scaleY,
+		boolean fixedSize,
+		boolean fixedAspect)
+	{
+		if (!fixedSize && !fixedAspect)
+		{
+			return computeMenuDest(capture, scaleX, scaleY, false, false);
+		}
+
+		final Rectangle tightDest = computeMenuDest(tight, scaleX, scaleY, fixedSize, fixedAspect);
+		final double contentScaleX = tight.width == 0 ? 1.0 : tightDest.width / (double) tight.width;
+		final double contentScaleY = tight.height == 0 ? 1.0 : tightDest.height / (double) tight.height;
+		final int offX = tight.x - capture.x;
+		final int offY = tight.y - capture.y;
+		final int dx = (int) Math.round(tightDest.x - offX * contentScaleX);
+		final int dy = (int) Math.round(tightDest.y - offY * contentScaleY);
+		final int dw = Math.max(1, (int) Math.round(capture.width * contentScaleX));
+		final int dh = Math.max(1, (int) Math.round(capture.height * contentScaleY));
 		return new Rectangle(dx, dy, dw, dh);
 	}
 

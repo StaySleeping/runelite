@@ -92,7 +92,7 @@ public interface StretchedModeConfig extends Config
 	@ConfigItem(
 		keyName = "fixedOverlayAspectRatio",
 		name = "Fixed overlay aspect ratio",
-		description = "Keep interface overlays (infoboxes, panels) at the game's aspect ratio instead of matching a non-uniform window stretch. Does not affect world or inventory overlays. Has no effect when Fixed overlay size is on.",
+		description = "Keep interface overlays (infoboxes, panels, tooltips) at the game's aspect ratio instead of matching a non-uniform window stretch. Only applies when horizontal and vertical stretch differ (typically with Keep aspect ratio off). Does not affect world or inventory overlays. Has no effect when Fixed overlay size is on.",
 		position = 5
 	)
 	default boolean fixedOverlayAspectRatio()
@@ -114,7 +114,7 @@ public interface StretchedModeConfig extends Config
 	@ConfigItem(
 		keyName = "fixedMenuAspectRatio",
 		name = "Fixed menu aspect ratio",
-		description = "When the menu scales with stretch, keep its aspect ratio so it is not squashed on ultrawide layouts. Has no effect when Fixed menu size is on.",
+		description = "When the menu scales with stretch, keep its aspect ratio so it is not squashed on ultrawide layouts. Only applies when horizontal and vertical stretch differ (typically with Keep aspect ratio off). Has no effect when Fixed menu size is on.",
 		position = 7
 	)
 	default boolean fixedMenuAspectRatio()
