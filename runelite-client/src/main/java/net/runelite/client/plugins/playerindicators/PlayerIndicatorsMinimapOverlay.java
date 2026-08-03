@@ -68,9 +68,9 @@ public class PlayerIndicatorsMinimapOverlay extends Overlay
 
 			if (minimapLocation != null)
 			{
-				final net.runelite.api.Point location =
-					OverlayUtil.adjustLocalTextScaleLocation(graphics, minimapLocation, name);
-				OverlayUtil.renderTextLocation(graphics, location, name, decorations.getColor());
+				// Minimap location is the actor dot (left-align text from it), not a
+				// getCanvasTextLocation-style centered left edge — do not adjustLocalTextScaleLocation.
+				OverlayUtil.renderTextLocation(graphics, minimapLocation, name, decorations.getColor());
 			}
 		}
 	}
