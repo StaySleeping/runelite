@@ -267,8 +267,10 @@ public class OverlayUtil
 				AffineTransform transform = graphics.getTransform();
 				graphics.translate(x, y);
 				graphics.scale(fx, fy);
+				float shadowX = screenPixelOffsetX(graphics);
+				float shadowY = screenPixelOffsetY(graphics);
 				graphics.setColor(Color.BLACK);
-				graphics.drawString(text, 1, 1);
+				graphics.drawString(text, shadowX, shadowY);
 				graphics.setColor(textColor);
 				graphics.drawString(text, 0, 0);
 				graphics.setTransform(transform);
@@ -471,6 +473,26 @@ public class OverlayUtil
 	{
 		Object value = graphics.getRenderingHint(KEY_NATIVE_LOCAL_TEXT_SCALE);
 		return Boolean.TRUE.equals(value);
+	}
+
+	/**
+	 * User-space offset that maps to approximately one device pixel on X after the
+	 * current transform (outer stretch × local content scale).
+	 */
+	public static float screenPixelOffsetX(Graphics2D graphics)
+	{
+		double scale = Math.abs(graphics.getTransform().getScaleX());
+		return scale == 0.0 ? 1f : (float) (1.0 / scale);
+	}
+
+	/**
+	 * User-space offset that maps to approximately one device pixel on Y after the
+	 * current transform (outer stretch × local content scale).
+	 */
+	public static float screenPixelOffsetY(Graphics2D graphics)
+	{
+		double scale = Math.abs(graphics.getTransform().getScaleY());
+		return scale == 0.0 ? 1f : (float) (1.0 / scale);
 	}
 
 	public static double getNativeVisualSizeFactor(Graphics2D graphics)

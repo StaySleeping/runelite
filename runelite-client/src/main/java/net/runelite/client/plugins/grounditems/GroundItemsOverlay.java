@@ -282,6 +282,8 @@ public class GroundItemsOverlay extends Overlay
 				continue;
 			}
 
+			final Point adjustedTextPoint = OverlayUtil.adjustLocalTextScaleLocation(graphics, textPoint, itemString);
+
 			final int offset = plugin.isHotKeyPressed()
 				? item.getOffset()
 				: offsetMap.compute(item.getItemLayer().getWorldLocation(), (k, v) -> v != null ? v + 1 : 0);
@@ -292,8 +294,8 @@ public class GroundItemsOverlay extends Overlay
 				? OverlayUtil.getNativeVisualSizeFactorY(graphics) : 1.0;
 			final int stringGap = Math.max(1, (int) Math.round(STRING_GAP * textScaleY));
 
-			final int textX = textPoint.getX();
-			final int textY = textPoint.getY() - (stringGap * offset);
+			final int textX = adjustedTextPoint.getX();
+			final int textY = adjustedTextPoint.getY() - (stringGap * offset);
 
 			if (plugin.isHotKeyPressed())
 			{

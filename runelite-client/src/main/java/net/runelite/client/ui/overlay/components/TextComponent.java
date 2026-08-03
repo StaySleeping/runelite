@@ -85,6 +85,8 @@ public class TextComponent implements RenderableEntity
 		int baseY = positionY;
 		double layoutScaleX = 1.0;
 		double layoutScaleY = 1.0;
+		float shadowX = 1f;
+		float shadowY = 1f;
 		if (OverlayUtil.isNativeLocalTextScale(graphics))
 		{
 			double fx = OverlayUtil.getNativeVisualSizeFactor(graphics);
@@ -98,6 +100,9 @@ public class TextComponent implements RenderableEntity
 				baseY = 0;
 				layoutScaleX = fx;
 				layoutScaleY = fy;
+				// 1 device pixel after outer stretch × local content scale
+				shadowX = OverlayUtil.screenPixelOffsetX(graphics);
+				shadowY = OverlayUtil.screenPixelOffsetY(graphics);
 			}
 		}
 
@@ -111,7 +116,7 @@ public class TextComponent implements RenderableEntity
 			String s = text.substring(idx, matcher.start());
 			idx = matcher.end();
 
-			renderText(graphics, textColor, baseX + width, baseY, s);
+			renderText(graphics, textColor, baseX + width, baseY, s, shadowX, shadowY);
 			width += fontMetrics.stringWidth(s);
 
 			textColor = Color.decode("#" + color);
@@ -119,7 +124,7 @@ public class TextComponent implements RenderableEntity
 
 		{
 			String s = text.substring(idx);
-			renderText(graphics, textColor, baseX + width, baseY, s);
+			renderText(graphics, textColor, baseX + width, baseY, s, shadowX, shadowY);
 			width += fontMetrics.stringWidth(s);
 		}
 
@@ -140,7 +145,8 @@ public class TextComponent implements RenderableEntity
 		return new Dimension(width, height);
 	}
 
-	private void renderText(Graphics2D graphics, Color color, int x, int y, String text)
+	private void renderText(Graphics2D graphics, Color color, int x, int y, String text,
+		float shadowX, float shadowY)
 	{
 		if (text.isEmpty())
 		{
@@ -151,18 +157,16 @@ public class TextComponent implements RenderableEntity
 
 		if (outline)
 		{
-			graphics.drawString(text, x, y + 1);
-			graphics.drawString(text, x, y - 1);
-			graphics.drawString(text, x + 1, y);
-			graphics.drawString(text, x - 1, y);
+			graphics.drawString(text, x, y + shadowY);
+			graphics.drawString(text, x, y - shadowY);
+			graphics.drawString(text, x + shadowX, y);
+			graphics.drawString(text, x - shadowX, y);
 		}
 		else
 		{
-			// shadow
-			graphics.drawString(text, x + 1, y + 1);
+			graphics.drawString(text, x + shadowX, y + shadowY);
 		}
 
-		// actual text
 		graphics.setColor(color);
 		graphics.drawString(text, x, y);
 	}
