@@ -78,13 +78,21 @@ public class NativeOverlayMenuTest
 	}
 
 	@Test
-	public void computeMenuDest_fixedSizeFlushRight()
+	public void computeMenuDest_nearEdgeCentersOnClickWhenFits()
 	{
-		// Client clamped menu to canvas right edge (800). Smaller dest must pin flush right.
+		// Client clamped menu flush-right, but smaller dest still fits centered on click.
 		Rectangle menu = new Rectangle(700, 20, 100, 50);
-		Rectangle dest = NativeOverlayMenu.computeMenuDest(menu, 2.0, 2.0, true, true, 800, 600);
+		Rectangle dest = NativeOverlayMenu.computeMenuDest(menu, 2.0, 2.0, true, true, 800, 600, true, 750, 20);
+		assertEquals(1450, dest.x);
+		assertEquals(1550, dest.x + dest.width);
+	}
+
+	@Test
+	public void computeMenuDest_clickPastEdgeClampsOnlyWhenNeeded()
+	{
+		Rectangle menu = new Rectangle(700, 20, 100, 50);
+		Rectangle dest = NativeOverlayMenu.computeMenuDest(menu, 2.0, 2.0, true, true, 800, 600, true, 790, 20);
 		assertEquals(1500, dest.x);
-		assertEquals(100, dest.width);
 		assertEquals(1600, dest.x + dest.width);
 	}
 
