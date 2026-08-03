@@ -262,14 +262,15 @@ public class OverlayRenderer extends MouseAdapter
 	public void renderOverlayLayer(Graphics2D graphics, final OverlayLayer layer)
 	{
 		final Collection<Overlay> overlays = overlayManager.getLayer(layer);
-		renderOverlays(graphics, overlays, layer);
+		renderOverlays(graphics, overlays, layer, true);
 	}
 
 	public void renderAfterInterface(Graphics2D graphics, int interfaceId, Collection<WidgetItem> widgetItems)
 	{
 		Collection<Overlay> overlays = overlayManager.getForInterface(interfaceId);
 		overlayManager.setWidgetItems(widgetItems);
-		renderOverlays(graphics, overlays, OverlayLayer.ABOVE_WIDGETS);
+		// Keep mid-UI hooks on the canvas so later client UI (e.g. the right-click menu) covers them.
+		renderOverlays(graphics, overlays, OverlayLayer.ABOVE_WIDGETS, false);
 		overlayManager.setWidgetItems(Collections.emptyList());
 	}
 
@@ -277,11 +278,13 @@ public class OverlayRenderer extends MouseAdapter
 	{
 		Collection<Overlay> overlays = overlayManager.getForLayer(layer.getId());
 		overlayManager.setWidgetItems(widgetItems);
-		renderOverlays(graphics, overlays, OverlayLayer.ABOVE_WIDGETS);
+		// Keep mid-UI hooks on the canvas so later client UI (e.g. the right-click menu) covers them.
+		renderOverlays(graphics, overlays, OverlayLayer.ABOVE_WIDGETS, false);
 		overlayManager.setWidgetItems(Collections.emptyList());
 	}
 
-	private void renderOverlays(final Graphics2D graphics, Collection<Overlay> overlays, final OverlayLayer layer)
+	private void renderOverlays(final Graphics2D graphics, Collection<Overlay> overlays, final OverlayLayer layer,
+		boolean allowNative)
 	{
 		if (overlays == null
 			|| overlays.isEmpty()
@@ -311,7 +314,7 @@ public class OverlayRenderer extends MouseAdapter
 		{
 			for (Overlay overlay : overlays)
 			{
-				final boolean overlayNative = shouldUseNativePass(overlay, layer);
+				final boolean overlayNative = allowNative && shouldUseNativePass(overlay, layer);
 				final boolean shapeAntialias = overlayNative
 					|| !overlay.isPreferUiPixelGrid()
 					|| !isGpuUiNearest();
@@ -394,18 +397,10 @@ public class OverlayRenderer extends MouseAdapter
 				{
 					if (overlayNative)
 					{
-						// Widget-item overlays must match stretched inventory/UI size, not Fixed overlay size.
-						if (overlay instanceof WidgetItemOverlay)
-						{
-							OverlayUtil.setNativeOverlayProperties(drawGraphics, 1.0, 1.0, true);
-						}
-						else
-						{
-							OverlayUtil.setNativeOverlayProperties(drawGraphics,
-								nativeOverlayBuffer.getPanelContentScaleX(),
-								nativeOverlayBuffer.getPanelContentScaleY(),
-								true);
-						}
+						OverlayUtil.setNativeOverlayProperties(drawGraphics,
+							nativeOverlayBuffer.getPanelContentScaleX(),
+							nativeOverlayBuffer.getPanelContentScaleY(),
+							true);
 					}
 					safeRender(overlay, drawGraphics, location, overlayNative);
 				}
@@ -916,7 +911,7 @@ public class OverlayRenderer extends MouseAdapter
 		// Set font based on configuration
 		if (position == OverlayPosition.DYNAMIC || position == OverlayPosition.DETACHED)
 		{
-			if (nativePass && !(overlay instanceof WidgetItemOverlay))
+			if (nativePass)
 			{
 				// Fixed overlay size: cancel stretch on glyphs. Otherwise keep full size.
 				float factor = (float) nativeOverlayBuffer.getPanelContentScaleX();
