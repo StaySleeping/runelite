@@ -325,7 +325,7 @@ public class NativeOverlayMenu
 	/**
 	 * Stretched-space destination for a canvas-space menu rectangle.
 	 * Fixed size centers on the stretched menu center in X (client click anchor) and
-	 * top-aligns in Y.
+	 * top-aligns in Y. With aspect off, fixed size keeps window aspect at {@code min(sx,sy)} size.
 	 */
 	public static Rectangle computeMenuDest(
 		Rectangle menu,
@@ -334,7 +334,9 @@ public class NativeOverlayMenu
 		boolean fixedSize,
 		boolean fixedAspect)
 	{
-		if (fixedSize)
+		final double s = Math.min(scaleX == 0 ? 1 : scaleX, scaleY == 0 ? 1 : scaleY);
+
+		if (fixedSize && fixedAspect)
 		{
 			final double cx = (menu.x + menu.width / 2.0) * scaleX;
 			final int dx = (int) Math.round(cx - menu.width / 2.0);
@@ -342,9 +344,18 @@ public class NativeOverlayMenu
 			return new Rectangle(dx, dy, menu.width, menu.height);
 		}
 
+		if (fixedSize)
+		{
+			final int dw = Math.max(1, (int) Math.round(menu.width * scaleX / s));
+			final int dh = Math.max(1, (int) Math.round(menu.height * scaleY / s));
+			final double cx = (menu.x + menu.width / 2.0) * scaleX;
+			final int dx = (int) Math.round(cx - dw / 2.0);
+			final int dy = (int) Math.round(menu.y * scaleY);
+			return new Rectangle(dx, dy, dw, dh);
+		}
+
 		if (fixedAspect)
 		{
-			final double s = Math.min(scaleX, scaleY);
 			final int dw = Math.max(1, (int) Math.round(menu.width * s));
 			final int dh = Math.max(1, (int) Math.round(menu.height * s));
 			final double cx = (menu.x + menu.width / 2.0) * scaleX;

@@ -166,37 +166,50 @@ public class NativeOverlayBuffer
 
 	/**
 	 * Content scale applied after the outer stretch transform for interface overlays
-	 * (infoboxes, panels, tooltips). Fixed size cancels stretch; fixed aspect uses
-	 * uniform {@code min(sx, sy)}; otherwise scale with the window.
+	 * (infoboxes, panels, tooltips).
+	 * <ul>
+	 * <li>Fixed size + fixed aspect: {@code 1/sx, 1/sy} (net 1×1 canvas pixels)</li>
+	 * <li>Fixed size only: {@code 1/s, 1/s} with {@code s=min(sx,sy)} (smaller, window aspect)</li>
+	 * <li>Fixed aspect only: {@code s/sx, s/sy} (uniform {@code s})</li>
+	 * <li>Else: {@code 1, 1} (full window stretch)</li>
+	 * </ul>
 	 */
 	public double getPanelContentScaleX()
 	{
+		final double sx = getScaleX();
+		final double sy = getScaleY();
+		final double s = Math.min(sx == 0 ? 1 : sx, sy == 0 ? 1 : sy);
+		if (fixedOverlaySize() && fixedOverlayAspectRatio())
+		{
+			return 1 / (sx == 0 ? 1 : sx);
+		}
 		if (fixedOverlaySize())
 		{
-			double sx = getScaleX();
-			return 1 / (sx == 0 ? 1 : sx);
+			return 1 / (s == 0 ? 1 : s);
 		}
 		if (fixedOverlayAspectRatio())
 		{
-			double sx = getScaleX();
-			double s = Math.min(sx, getScaleY());
-			return (sx == 0 ? 1 : s / sx);
+			return sx == 0 ? 1 : s / sx;
 		}
 		return 1;
 	}
 
 	public double getPanelContentScaleY()
 	{
+		final double sx = getScaleX();
+		final double sy = getScaleY();
+		final double s = Math.min(sx == 0 ? 1 : sx, sy == 0 ? 1 : sy);
+		if (fixedOverlaySize() && fixedOverlayAspectRatio())
+		{
+			return 1 / (sy == 0 ? 1 : sy);
+		}
 		if (fixedOverlaySize())
 		{
-			double sy = getScaleY();
-			return 1 / (sy == 0 ? 1 : sy);
+			return 1 / (s == 0 ? 1 : s);
 		}
 		if (fixedOverlayAspectRatio())
 		{
-			double sy = getScaleY();
-			double s = Math.min(getScaleX(), sy);
-			return (sy == 0 ? 1 : s / sy);
+			return sy == 0 ? 1 : s / sy;
 		}
 		return 1;
 	}

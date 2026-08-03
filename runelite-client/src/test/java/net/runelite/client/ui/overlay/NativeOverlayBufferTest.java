@@ -249,7 +249,18 @@ public class NativeOverlayBufferTest
 	}
 
 	@Test
-	public void panelContentScale_fixedSizeWinsOverAspect()
+	public void panelContentScale_fixedSizeKeepsWindowAspect()
+	{
+		when(client.getStretchedDimensions()).thenReturn(new Dimension(300, 160));
+		when(stretchedModeConfig.fixedOverlaySize()).thenReturn(true);
+
+		// sx=3, sy=2, s=2 → content (1/s, 1/s); net (sx/s, sy/s) = (1.5, 1)
+		assertEquals(0.5, buffer.getPanelContentScaleX(), 1e-9);
+		assertEquals(0.5, buffer.getPanelContentScaleY(), 1e-9);
+	}
+
+	@Test
+	public void panelContentScale_fixedSizeAndAspectTrueCanvas()
 	{
 		when(client.getStretchedDimensions()).thenReturn(new Dimension(300, 160));
 		when(stretchedModeConfig.fixedOverlaySize()).thenReturn(true);

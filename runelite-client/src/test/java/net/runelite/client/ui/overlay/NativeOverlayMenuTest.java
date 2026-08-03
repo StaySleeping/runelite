@@ -47,15 +47,15 @@ public class NativeOverlayMenuTest
 	}
 
 	@Test
-	public void computeMenuDest_fixedSizeCentersX()
+	public void computeMenuDest_fixedSizeKeepsWindowAspect()
 	{
-		// Stretched center X = (40+50)*3 = 270; dest left = 270 - 50 = 220; top = 20*2 = 40
+		// s=min(3,2)=2; size (100*3/2, 50*2/2)=(150,50); center X=270 → left=195; top=40
 		Rectangle dest = NativeOverlayMenu.computeMenuDest(MENU, 3.0, 2.0, true, false);
-		assertEquals(new Rectangle(220, 40, 100, 50), dest);
+		assertEquals(new Rectangle(195, 40, 150, 50), dest);
 	}
 
 	@Test
-	public void computeMenuDest_fixedSizeIgnoresAspectFlag()
+	public void computeMenuDest_fixedSizeAndAspectTrueCanvas()
 	{
 		Rectangle dest = NativeOverlayMenu.computeMenuDest(MENU, 3.0, 2.0, true, true);
 		assertEquals(new Rectangle(220, 40, 100, 50), dest);
@@ -93,12 +93,11 @@ public class NativeOverlayMenuTest
 		Rectangle tight = new Rectangle(40, 20, 100, 50);
 		Rectangle dest = NativeOverlayMenu.computeCaptureDest(capture, tight, 3.0, 2.0, true, false);
 		Rectangle tightDest = NativeOverlayMenu.computeMenuDest(tight, 3.0, 2.0, true, false);
-		// Pad left of tight = 40; content scale = 1 → dest.x = tightDest.x - 40
-		assertEquals(tightDest.x - 40, dest.x);
+		// content scale X = 150/100 = 1.5, Y = 1
+		assertEquals(tightDest.x - (int) Math.round(40 * 1.5), dest.x);
 		assertEquals(tightDest.y - 10, dest.y);
-		assertEquals(200, dest.width);
+		assertEquals(300, dest.width);
 		assertEquals(80, dest.height);
-		// Menu pixels at offset 40 in the crop land on tightDest.x
-		assertEquals(tightDest.x, dest.x + 40);
+		assertEquals(tightDest.x, dest.x + (int) Math.round(40 * 1.5));
 	}
 }

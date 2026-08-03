@@ -81,7 +81,7 @@ public interface StretchedModeConfig extends Config
 	@ConfigItem(
 		keyName = "fixedOverlaySize",
 		name = "Fixed overlay size",
-		description = "Keep RuneLite overlays (infoboxes, panels, names, etc.) at their original size instead of scaling them with the stretched game.",
+		description = "Keep interface overlays smaller than full UI stretch. With Fixed overlay aspect ratio off, they still match the window's aspect; with it on, they stay true canvas 1×1 pixels.",
 		position = 4
 	)
 	default boolean fixedOverlaySize()
@@ -92,7 +92,7 @@ public interface StretchedModeConfig extends Config
 	@ConfigItem(
 		keyName = "fixedOverlayAspectRatio",
 		name = "Fixed overlay aspect ratio",
-		description = "Keep interface overlays (infoboxes, panels, tooltips) at the game's aspect ratio instead of matching a non-uniform window stretch. Only applies when horizontal and vertical stretch differ (typically with Keep aspect ratio off). Does not affect world or inventory overlays. Has no effect when Fixed overlay size is on.",
+		description = "Keep interface overlays (infoboxes, panels, tooltips) at the game's aspect ratio instead of matching a non-uniform window stretch. Only applies when horizontal and vertical stretch differ (typically with Keep aspect ratio off). Does not affect world or inventory overlays. With Fixed overlay size on, forces true canvas 1×1 pixels.",
 		position = 5
 	)
 	default boolean fixedOverlayAspectRatio()
@@ -103,7 +103,7 @@ public interface StretchedModeConfig extends Config
 	@ConfigItem(
 		keyName = "fixedMenuSize",
 		name = "Fixed menu size",
-		description = "Keep the right-click menu at its original size instead of scaling it with the stretched game. Requires native resolution overlays.",
+		description = "Keep the right-click menu smaller than full UI stretch. With Fixed menu aspect ratio off, it still matches the window's aspect; with it on, it stays true canvas size. Requires native resolution overlays.",
 		position = 6
 	)
 	default boolean fixedMenuSize()
@@ -114,7 +114,7 @@ public interface StretchedModeConfig extends Config
 	@ConfigItem(
 		keyName = "fixedMenuAspectRatio",
 		name = "Fixed menu aspect ratio",
-		description = "When the menu scales with stretch, keep its aspect ratio so it is not squashed on ultrawide layouts. Only applies when horizontal and vertical stretch differ (typically with Keep aspect ratio off). Has no effect when Fixed menu size is on.",
+		description = "When the menu scales with stretch, keep its aspect ratio so it is not squashed on ultrawide layouts. Only applies when horizontal and vertical stretch differ (typically with Keep aspect ratio off). With Fixed menu size on, forces true canvas size.",
 		position = 7
 	)
 	default boolean fixedMenuAspectRatio()
