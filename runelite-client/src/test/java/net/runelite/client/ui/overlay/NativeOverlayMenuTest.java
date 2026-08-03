@@ -81,23 +81,40 @@ public class NativeOverlayMenuTest
 	public void computeCaptureDest_defaultUsesCaptureBounds()
 	{
 		Rectangle capture = new Rectangle(0, 10, 200, 80);
-		Rectangle tight = new Rectangle(40, 20, 100, 50);
-		Rectangle dest = NativeOverlayMenu.computeCaptureDest(capture, tight, 2.0, 2.0, false, false);
+		Rectangle root = new Rectangle(40, 20, 100, 50);
+		Rectangle dest = NativeOverlayMenu.computeCaptureDest(capture, root, 2.0, 2.0, false, false);
 		assertEquals(NativeOverlayMenu.computeMenuDest(capture, 2.0, 2.0, false, false), dest);
 	}
 
 	@Test
-	public void computeCaptureDest_fixedSizeKeepsTightAnchorWithPad()
+	public void computeCaptureDest_fixedSizeKeepsRootAnchorWithPad()
 	{
 		Rectangle capture = new Rectangle(0, 10, 200, 80);
-		Rectangle tight = new Rectangle(40, 20, 100, 50);
-		Rectangle dest = NativeOverlayMenu.computeCaptureDest(capture, tight, 3.0, 2.0, true, false);
-		Rectangle tightDest = NativeOverlayMenu.computeMenuDest(tight, 3.0, 2.0, true, false);
+		Rectangle root = new Rectangle(40, 20, 100, 50);
+		Rectangle dest = NativeOverlayMenu.computeCaptureDest(capture, root, 3.0, 2.0, true, false);
+		Rectangle rootDest = NativeOverlayMenu.computeMenuDest(root, 3.0, 2.0, true, false);
 		// content scale X = 150/100 = 1.5, Y = 1
-		assertEquals(tightDest.x - (int) Math.round(40 * 1.5), dest.x);
-		assertEquals(tightDest.y - 10, dest.y);
+		assertEquals(rootDest.x - (int) Math.round(40 * 1.5), dest.x);
+		assertEquals(rootDest.y - 10, dest.y);
 		assertEquals(300, dest.width);
 		assertEquals(80, dest.height);
-		assertEquals(tightDest.x, dest.x + (int) Math.round(40 * 1.5));
+		assertEquals(rootDest.x, dest.x + (int) Math.round(40 * 1.5));
+	}
+
+	@Test
+	public void computeCaptureDest_rootStableWhenCaptureGrowsForSubmenu()
+	{
+		Rectangle root = new Rectangle(200, 20, 100, 50);
+		Rectangle captureBefore = new Rectangle(0, 4, 480, 82); // padded around root
+		Rectangle captureAfter = new Rectangle(40, 20, 260, 50); // root + submenu to the left
+		Rectangle destBefore = NativeOverlayMenu.computeCaptureDest(captureBefore, root, 2.0, 2.0, true, true);
+		Rectangle destAfter = NativeOverlayMenu.computeCaptureDest(captureAfter, root, 2.0, 2.0, true, true);
+		Rectangle rootDest = NativeOverlayMenu.computeMenuDest(root, 2.0, 2.0, true, true);
+
+		int rootVisualBefore = destBefore.x + (root.x - captureBefore.x);
+		int rootVisualAfter = destAfter.x + (root.x - captureAfter.x);
+		assertEquals(rootDest.x, rootVisualBefore);
+		assertEquals(rootDest.x, rootVisualAfter);
+		assertEquals(rootVisualBefore, rootVisualAfter);
 	}
 }

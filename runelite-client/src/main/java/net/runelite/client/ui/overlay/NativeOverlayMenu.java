@@ -227,10 +227,11 @@ public class NativeOverlayMenu
 		}
 
 		lastCaptureBounds = new Rectangle(menu);
-		final Rectangle tight = getTightMenuBounds(client);
+		// Pin dest to the root menu so opening a submenu does not re-center/shift the tree.
+		final Rectangle root = getRootMenuBounds(client);
 		lastCaptureDest = computeCaptureDest(
 			menu,
-			tight != null ? tight : menu,
+			root != null ? root : menu,
 			nativeOverlayBuffer.getScaleX(),
 			nativeOverlayBuffer.getScaleY(),
 			nativeOverlayBuffer.fixedMenuSize(),
@@ -270,7 +271,8 @@ public class NativeOverlayMenu
 
 	/**
 	 * After stretch→canvas mouse translate, remap so clicks match a fixed-size or
-	 * aspect-corrected visual menu. Returns {@code null} when no adjustment is needed.
+	 * aspect-corrected visual menu. Anchored on the root menu so submenu open does
+	 * not shift hit-testing. Returns {@code null} when no adjustment is needed.
 	 */
 	@Nullable
 	public Point remapTranslatedMouse(int stretchedX, int stretchedY, int canvasX, int canvasY)
@@ -287,27 +289,29 @@ public class NativeOverlayMenu
 			return null;
 		}
 
+		final Rectangle root = getRootMenuBounds(client);
 		final Rectangle hit = getTightMenuBounds(client);
-		if (hit == null)
+		if (root == null || hit == null)
 		{
 			return null;
 		}
 
 		final double sx = nativeOverlayBuffer.getScaleX();
 		final double sy = nativeOverlayBuffer.getScaleY();
-		final Rectangle dest = computeMenuDest(hit, sx, sy, fixedSize, fixedAspect);
-		final Rectangle defaultDest = computeMenuDest(hit, sx, sy, false, false);
-		if (dest.equals(defaultDest))
+		final Rectangle rootDest = computeMenuDest(root, sx, sy, fixedSize, fixedAspect);
+		final Rectangle visualHit = mapCanvasRectFromAnchor(hit, root, rootDest);
+		final Rectangle defaultHitDest = computeMenuDest(hit, sx, sy, false, false);
+		if (visualHit.equals(defaultHitDest))
 		{
 			return null;
 		}
 
-		if (dest.contains(stretchedX, stretchedY))
+		if (visualHit.contains(stretchedX, stretchedY))
 		{
-			final double nx = (stretchedX - dest.x) / (double) dest.width;
-			final double ny = (stretchedY - dest.y) / (double) dest.height;
-			final int mx = hit.x + (int) Math.floor(nx * hit.width);
-			final int my = hit.y + (int) Math.floor(ny * hit.height);
+			final double csx = root.width == 0 ? 1.0 : rootDest.width / (double) root.width;
+			final double csy = root.height == 0 ? 1.0 : rootDest.height / (double) root.height;
+			final int mx = (int) Math.floor(root.x + (stretchedX - rootDest.x) / csx);
+			final int my = (int) Math.floor(root.y + (stretchedY - rootDest.y) / csy);
 			return new Point(
 				Math.max(hit.x, Math.min(hit.x + hit.width - 1, mx)),
 				Math.max(hit.y, Math.min(hit.y + hit.height - 1, my)));
@@ -373,12 +377,12 @@ public class NativeOverlayMenu
 	}
 
 	/**
-	 * Dest for a padded capture crop so the tight menu stays correctly anchored
-	 * under fixed size / aspect (pad must not shift content left/right).
+	 * Dest for a capture crop anchored on {@code anchor} (typically the root menu) so
+	 * submenu union growth does not re-center/shift the tree.
 	 */
 	public static Rectangle computeCaptureDest(
 		Rectangle capture,
-		Rectangle tight,
+		Rectangle anchor,
 		double scaleX,
 		double scaleY,
 		boolean fixedSize,
@@ -389,15 +393,22 @@ public class NativeOverlayMenu
 			return computeMenuDest(capture, scaleX, scaleY, false, false);
 		}
 
-		final Rectangle tightDest = computeMenuDest(tight, scaleX, scaleY, fixedSize, fixedAspect);
-		final double contentScaleX = tight.width == 0 ? 1.0 : tightDest.width / (double) tight.width;
-		final double contentScaleY = tight.height == 0 ? 1.0 : tightDest.height / (double) tight.height;
-		final int offX = tight.x - capture.x;
-		final int offY = tight.y - capture.y;
-		final int dx = (int) Math.round(tightDest.x - offX * contentScaleX);
-		final int dy = (int) Math.round(tightDest.y - offY * contentScaleY);
-		final int dw = Math.max(1, (int) Math.round(capture.width * contentScaleX));
-		final int dh = Math.max(1, (int) Math.round(capture.height * contentScaleY));
+		final Rectangle anchorDest = computeMenuDest(anchor, scaleX, scaleY, fixedSize, fixedAspect);
+		return mapCanvasRectFromAnchor(capture, anchor, anchorDest);
+	}
+
+	/**
+	 * Maps a canvas-space rect into stretched space using the same content scale as
+	 * {@code anchor} → {@code anchorDest}.
+	 */
+	public static Rectangle mapCanvasRectFromAnchor(Rectangle canvasRect, Rectangle anchor, Rectangle anchorDest)
+	{
+		final double contentScaleX = anchor.width == 0 ? 1.0 : anchorDest.width / (double) anchor.width;
+		final double contentScaleY = anchor.height == 0 ? 1.0 : anchorDest.height / (double) anchor.height;
+		final int dx = (int) Math.round(anchorDest.x + (canvasRect.x - anchor.x) * contentScaleX);
+		final int dy = (int) Math.round(anchorDest.y + (canvasRect.y - anchor.y) * contentScaleY);
+		final int dw = Math.max(1, (int) Math.round(canvasRect.width * contentScaleX));
+		final int dh = Math.max(1, (int) Math.round(canvasRect.height * contentScaleY));
 		return new Rectangle(dx, dy, dw, dh);
 	}
 
@@ -413,6 +424,45 @@ public class NativeOverlayMenu
 			// IS off, or IS with hdMenu off and menuAlpha 255
 			client.drawOriginalMenu(255);
 		}
+	}
+
+	/**
+	 * Top-level menu bounds only (no submenu union). Used to anchor fixed-size/aspect dest.
+	 */
+	@Nullable
+	public static Rectangle getRootMenuBounds(Client client)
+	{
+		if (!client.isMenuOpen())
+		{
+			return null;
+		}
+
+		Rectangle bounds = null;
+		final Menu root = client.getMenu();
+		if (root != null)
+		{
+			final int w = root.getMenuWidth();
+			final int h = root.getMenuHeight();
+			if (w > 0 && h > 0)
+			{
+				bounds = new Rectangle(root.getMenuX(), root.getMenuY(), w, h);
+			}
+		}
+
+		if (bounds == null)
+		{
+			final int x = client.getMenuX();
+			final int y = client.getMenuY();
+			final int w = client.getMenuWidth();
+			final int h = client.getMenuHeight();
+			if (w <= 0 || h <= 0)
+			{
+				return null;
+			}
+			bounds = new Rectangle(x, y, w, h);
+		}
+
+		return clipToCanvas(client, bounds);
 	}
 
 	/**
@@ -434,14 +484,7 @@ public class NativeOverlayMenu
 			bounds.grow(SUBMENU_CAPTURE_PAD, 16);
 		}
 
-		final int canvasW = client.getCanvasWidth();
-		final int canvasH = client.getCanvasHeight();
-		final Rectangle clipped = bounds.intersection(new Rectangle(0, 0, canvasW, canvasH));
-		if (clipped.width <= 0 || clipped.height <= 0)
-		{
-			return null;
-		}
-		return clipped;
+		return clipToCanvas(client, bounds);
 	}
 
 	/**
@@ -475,6 +518,12 @@ public class NativeOverlayMenu
 			bounds = new Rectangle(x, y, w, h);
 		}
 
+		return clipToCanvas(client, bounds);
+	}
+
+	@Nullable
+	private static Rectangle clipToCanvas(Client client, Rectangle bounds)
+	{
 		final int canvasW = client.getCanvasWidth();
 		final int canvasH = client.getCanvasHeight();
 		final Rectangle clipped = bounds.intersection(new Rectangle(0, 0, canvasW, canvasH));
