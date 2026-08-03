@@ -24,8 +24,8 @@
  */
 package net.runelite.client.ui.overlay;
 
-import java.awt.Dimension;
 import java.awt.Graphics2D;
+import java.awt.Point;
 import java.awt.Rectangle;
 import java.awt.RenderingHints;
 import java.awt.image.BufferedImage;
@@ -33,6 +33,7 @@ import java.awt.image.DataBufferInt;
 import javax.annotation.Nullable;
 import javax.inject.Inject;
 import javax.inject.Singleton;
+import lombok.Getter;
 import net.runelite.api.BufferProvider;
 import net.runelite.api.Client;
 import net.runelite.api.Menu;
@@ -52,6 +53,9 @@ import net.runelite.client.eventbus.Subscribe;
  * Menu look and transparency come only from Interface Styles when that plugin is
  * enabled ({@code hdMenu} / {@code menuAlpha}). With Interface Styles off (or HD
  * off and alpha 255), capture falls back to opaque {@code drawOriginalMenu(255)}.
+ * <p>
+ * Stretched Mode {@code fixedMenuSize} / {@code fixedMenuAspectRatio} control how the
+ * captured menu is placed into the stretched frame; mouse coords are remapped to match.
  */
 @Singleton
 public class NativeOverlayMenu
@@ -65,6 +69,16 @@ public class NativeOverlayMenu
 
 	private boolean deferredMenu;
 	private boolean capturingMenu;
+
+	/** Canvas crop used for the last successful capture (may include submenu pad). */
+	@Getter
+	@Nullable
+	private Rectangle lastCaptureBounds;
+
+	/** Stretched-space dest for {@link #lastCaptureBounds}. */
+	@Getter
+	@Nullable
+	private Rectangle lastCaptureDest;
 
 	@Inject
 	private NativeOverlayMenu(
@@ -109,7 +123,8 @@ public class NativeOverlayMenu
 
 	/**
 	 * Full canvas-sized straight ARGB image from black/white Interface Styles / client paint,
-	 * placed at the client's menu layout (center-X on click).
+	 * placed at the client's menu layout (center-X on click). Updates
+	 * {@link #lastCaptureBounds} / {@link #lastCaptureDest} for compositors.
 	 */
 	@Nullable
 	public BufferedImage captureMenuLayer()
@@ -123,6 +138,8 @@ public class NativeOverlayMenu
 		if (menu == null)
 		{
 			clearDeferredMenu();
+			lastCaptureBounds = null;
+			lastCaptureDest = null;
 			return null;
 		}
 
@@ -131,6 +148,8 @@ public class NativeOverlayMenu
 		if (canvasW <= 0 || canvasH <= 0)
 		{
 			clearDeferredMenu();
+			lastCaptureBounds = null;
+			lastCaptureDest = null;
 			return null;
 		}
 
@@ -207,31 +226,134 @@ public class NativeOverlayMenu
 			}
 		}
 
+		lastCaptureBounds = new Rectangle(menu);
+		lastCaptureDest = computeMenuDest(
+			menu,
+			nativeOverlayBuffer.getScaleX(),
+			nativeOverlayBuffer.getScaleY(),
+			nativeOverlayBuffer.fixedMenuSize(),
+			nativeOverlayBuffer.fixedMenuAspectRatio());
+
 		clearDeferredMenu();
 		return image;
 	}
 
 	/**
-	 * Draw the captured full-canvas menu layer onto a stretched frame after ABOVE_UI.
+	 * Draw the captured menu crop onto a stretched frame after ABOVE_UI.
 	 */
 	public void compositeOntoStretched(Graphics2D g)
 	{
 		final BufferedImage menuImage = captureMenuLayer();
-		if (menuImage == null || !client.isStretchedEnabled())
+		final Rectangle src = lastCaptureBounds;
+		final Rectangle dest = lastCaptureDest;
+		if (menuImage == null || src == null || dest == null || !client.isStretchedEnabled())
 		{
 			clearDeferredMenu();
 			return;
 		}
 
-		final Dimension stretched = client.getStretchedDimensions();
 		final Object oldInterp = g.getRenderingHint(RenderingHints.KEY_INTERPOLATION);
 		// Nearest keeps glyph edges from picking up neighbouring translucent fill.
 		g.setRenderingHint(RenderingHints.KEY_INTERPOLATION, RenderingHints.VALUE_INTERPOLATION_NEAREST_NEIGHBOR);
-		g.drawImage(menuImage, 0, 0, stretched.width, stretched.height, null);
+		g.drawImage(
+			menuImage,
+			dest.x, dest.y, dest.x + dest.width, dest.y + dest.height,
+			src.x, src.y, src.x + src.width, src.y + src.height,
+			null);
 		if (oldInterp != null)
 		{
 			g.setRenderingHint(RenderingHints.KEY_INTERPOLATION, oldInterp);
 		}
+	}
+
+	/**
+	 * After stretch→canvas mouse translate, remap so clicks match a fixed-size or
+	 * aspect-corrected visual menu. Returns {@code null} when no adjustment is needed.
+	 */
+	@Nullable
+	public Point remapTranslatedMouse(int stretchedX, int stretchedY, int canvasX, int canvasY)
+	{
+		if (!nativeOverlayBuffer.isActive() || !client.isMenuOpen())
+		{
+			return null;
+		}
+
+		final boolean fixedSize = nativeOverlayBuffer.fixedMenuSize();
+		final boolean fixedAspect = nativeOverlayBuffer.fixedMenuAspectRatio();
+		if (!fixedSize && !fixedAspect)
+		{
+			return null;
+		}
+
+		final Rectangle hit = getTightMenuBounds(client);
+		if (hit == null)
+		{
+			return null;
+		}
+
+		final double sx = nativeOverlayBuffer.getScaleX();
+		final double sy = nativeOverlayBuffer.getScaleY();
+		final Rectangle dest = computeMenuDest(hit, sx, sy, fixedSize, fixedAspect);
+		final Rectangle defaultDest = computeMenuDest(hit, sx, sy, false, false);
+		if (dest.equals(defaultDest))
+		{
+			return null;
+		}
+
+		if (dest.contains(stretchedX, stretchedY))
+		{
+			final double nx = (stretchedX - dest.x) / (double) dest.width;
+			final double ny = (stretchedY - dest.y) / (double) dest.height;
+			final int mx = hit.x + (int) Math.floor(nx * hit.width);
+			final int my = hit.y + (int) Math.floor(ny * hit.height);
+			return new Point(
+				Math.max(hit.x, Math.min(hit.x + hit.width - 1, mx)),
+				Math.max(hit.y, Math.min(hit.y + hit.height - 1, my)));
+		}
+
+		if (hit.contains(canvasX, canvasY))
+		{
+			// Outside the visual menu but inside the stretched hit-box — miss the menu.
+			return new Point(hit.x - 1, hit.y - 1);
+		}
+
+		return null;
+	}
+
+	/**
+	 * Stretched-space destination for a canvas-space menu rectangle.
+	 */
+	public static Rectangle computeMenuDest(
+		Rectangle menu,
+		double scaleX,
+		double scaleY,
+		boolean fixedSize,
+		boolean fixedAspect)
+	{
+		if (fixedSize)
+		{
+			final int dx = (int) Math.round(menu.x * scaleX);
+			final int dy = (int) Math.round(menu.y * scaleY);
+			return new Rectangle(dx, dy, menu.width, menu.height);
+		}
+
+		if (fixedAspect)
+		{
+			final double s = Math.min(scaleX, scaleY);
+			final int dw = Math.max(1, (int) Math.round(menu.width * s));
+			final int dh = Math.max(1, (int) Math.round(menu.height * s));
+			final double cx = (menu.x + menu.width / 2.0) * scaleX;
+			final double cy = (menu.y + menu.height / 2.0) * scaleY;
+			final int dx = (int) Math.round(cx - dw / 2.0);
+			final int dy = (int) Math.round(cy - dh / 2.0);
+			return new Rectangle(dx, dy, dw, dh);
+		}
+
+		final int dx = (int) Math.round(menu.x * scaleX);
+		final int dy = (int) Math.round(menu.y * scaleY);
+		final int dw = Math.max(1, (int) Math.round(menu.width * scaleX));
+		final int dh = Math.max(1, (int) Math.round(menu.height * scaleY));
+		return new Rectangle(dx, dy, dw, dh);
 	}
 
 	/**
@@ -248,8 +370,40 @@ public class NativeOverlayMenu
 		}
 	}
 
+	/**
+	 * Padded capture bounds (includes submenu flyout pad when needed).
+	 */
 	@Nullable
 	public static Rectangle getCanvasBounds(Client client)
+	{
+		Rectangle bounds = getTightMenuBounds(client);
+		if (bounds == null)
+		{
+			return null;
+		}
+
+		final Menu root = client.getMenu();
+		if (root != null && menuTreeHasSubmenu(root))
+		{
+			bounds = new Rectangle(bounds);
+			bounds.grow(SUBMENU_CAPTURE_PAD, 16);
+		}
+
+		final int canvasW = client.getCanvasWidth();
+		final int canvasH = client.getCanvasHeight();
+		final Rectangle clipped = bounds.intersection(new Rectangle(0, 0, canvasW, canvasH));
+		if (clipped.width <= 0 || clipped.height <= 0)
+		{
+			return null;
+		}
+		return clipped;
+	}
+
+	/**
+	 * Tight union of open menu / submenu rectangles (no capture pad).
+	 */
+	@Nullable
+	public static Rectangle getTightMenuBounds(Client client)
 	{
 		if (!client.isMenuOpen())
 		{
@@ -274,13 +428,6 @@ public class NativeOverlayMenu
 				return null;
 			}
 			bounds = new Rectangle(x, y, w, h);
-		}
-
-		// Submenus open beside the parent; their Menu x/y can lag a frame, so pad
-		// whenever the tree has any submenu slot.
-		if (root != null && menuTreeHasSubmenu(root))
-		{
-			bounds.grow(SUBMENU_CAPTURE_PAD, 16);
 		}
 
 		final int canvasW = client.getCanvasWidth();

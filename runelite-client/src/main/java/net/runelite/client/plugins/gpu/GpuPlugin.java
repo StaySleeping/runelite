@@ -1720,52 +1720,60 @@ public class GpuPlugin extends Plugin implements DrawCallbacks
 	 * Composite a deferred right-click menu after ABOVE_UI. Black/white capture yields
 	 * real Interface Styles alpha; upload through the UI program. Always sample nearest
 	 * so glyph edges do not pick up neighbouring translucent fill when stretched.
+	 * Dest rect follows Stretched Mode fixed menu size / aspect ratio settings.
 	 */
 	private void drawDeferredMenu(final int overlayColor, final int canvasHeight, final int canvasWidth)
 	{
 		final BufferedImage menuImage = nativeOverlayMenu.captureMenuLayer();
-		if (menuImage == null || canvasWidth <= 0 || canvasHeight <= 0)
+		final Rectangle src = nativeOverlayMenu.getLastCaptureBounds();
+		final Rectangle dest = nativeOverlayMenu.getLastCaptureDest();
+		if (menuImage == null || src == null || dest == null || src.width <= 0 || src.height <= 0
+			|| dest.width <= 0 || dest.height <= 0 || canvasWidth <= 0 || canvasHeight <= 0)
 		{
 			return;
 		}
 
 		final int[] argb = ((DataBufferInt) menuImage.getRaster().getDataBuffer()).getData();
-		// Straight ARGB → premultiplied AARRGGBB (same packing as NativeOverlayBuffer / UI upload)
-		final int[] upload = new int[argb.length];
-		for (int i = 0; i < argb.length; ++i)
+		final int[] upload = new int[src.width * src.height];
+		for (int y = 0; y < src.height; ++y)
 		{
-			final int p = argb[i];
-			final int a = p >>> 24;
-			if (a == 0)
+			final int srcRow = (src.y + y) * canvasWidth + src.x;
+			final int dstRow = y * src.width;
+			for (int x = 0; x < src.width; ++x)
 			{
-				upload[i] = 0;
-			}
-			else if (a == 255)
-			{
-				upload[i] = p;
-			}
-			else
-			{
-				final int r = p >> 16 & 0xFF;
-				final int g = p >> 8 & 0xFF;
-				final int b = p & 0xFF;
-				upload[i] = a << 24
-					| ((r * a + 127) / 255) << 16
-					| ((g * a + 127) / 255) << 8
-					| (b * a + 127) / 255;
+				final int p = argb[srcRow + x];
+				final int a = p >>> 24;
+				if (a == 0)
+				{
+					upload[dstRow + x] = 0;
+				}
+				else if (a == 255)
+				{
+					upload[dstRow + x] = p;
+				}
+				else
+				{
+					final int r = p >> 16 & 0xFF;
+					final int g = p >> 8 & 0xFF;
+					final int b = p & 0xFF;
+					upload[dstRow + x] = a << 24
+						| ((r * a + 127) / 255) << 16
+						| ((g * a + 127) / 255) << 8
+						| (b * a + 127) / 255;
+				}
 			}
 		}
 
 		glEnable(GL_BLEND);
 		glBlendFunc(GL_ONE, GL_ONE_MINUS_SRC_ALPHA);
 		glBindTexture(GL_TEXTURE_2D, overlayTexture);
-		glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, canvasWidth, canvasHeight, 0, GL_BGRA, GL_UNSIGNED_INT_8_8_8_8_REV, upload);
-		lastOverlayWidth = canvasWidth;
-		lastOverlayHeight = canvasHeight;
+		glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, src.width, src.height, 0, GL_BGRA, GL_UNSIGNED_INT_8_8_8_8_REV, upload);
+		lastOverlayWidth = src.width;
+		lastOverlayHeight = src.height;
 
 		glUseProgram(glUiProgram);
 		glUniform1i(uniTex, 0);
-		glUniform2i(uniTexSourceDimensions, canvasWidth, canvasHeight);
+		glUniform2i(uniTexSourceDimensions, src.width, src.height);
 		glUniform4f(uniUiAlphaOverlay,
 			(overlayColor >> 16 & 0xFF) / 255f,
 			(overlayColor >> 8 & 0xFF) / 255f,
@@ -1773,12 +1781,14 @@ public class GpuPlugin extends Plugin implements DrawCallbacks
 			(overlayColor >>> 24) / 255f
 		);
 		glUniform1f(uniUiColorblindIntensity, config.colorBlindIntensity());
+		glUniform2i(uniTexTargetDimensions, dest.width, dest.height);
 
 		if (client.isStretchedEnabled())
 		{
-			Dimension dim = client.getStretchedDimensions();
-			glDpiAwareViewport(0, 0, dim.width, dim.height);
-			glUniform2i(uniTexTargetDimensions, dim.width, dim.height);
+			final Dimension stretched = client.getStretchedDimensions();
+			// OpenGL viewport origin is bottom-left; dest is top-left AWT space.
+			final int glY = stretched.height - dest.y - dest.height;
+			glDpiAwareViewport(dest.x, glY, dest.width, dest.height);
 		}
 		else
 		{

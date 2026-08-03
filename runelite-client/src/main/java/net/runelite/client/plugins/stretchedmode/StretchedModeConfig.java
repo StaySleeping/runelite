@@ -88,4 +88,26 @@ public interface StretchedModeConfig extends Config
 	{
 		return false;
 	}
+
+	@ConfigItem(
+		keyName = "fixedMenuSize",
+		name = "Fixed menu size",
+		description = "Keep the right-click menu at its original size instead of scaling it with the stretched game. Requires native resolution overlays.",
+		position = 5
+	)
+	default boolean fixedMenuSize()
+	{
+		return false;
+	}
+
+	@ConfigItem(
+		keyName = "fixedMenuAspectRatio",
+		name = "Fixed menu aspect ratio",
+		description = "When the menu scales with stretch, keep its aspect ratio so it is not squashed on ultrawide layouts. Has no effect when Fixed menu size is on.",
+		position = 6
+	)
+	default boolean fixedMenuAspectRatio()
+	{
+		return false;
+	}
 }

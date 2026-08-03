@@ -140,6 +140,22 @@ public class NativeOverlayBuffer
 	}
 
 	/**
+	 * When true, the deferred right-click menu keeps canvas (unstretched) size.
+	 */
+	public boolean fixedMenuSize()
+	{
+		return stretchedModeConfig.fixedMenuSize();
+	}
+
+	/**
+	 * When true (and fixed menu size is off), the deferred menu scales uniformly.
+	 */
+	public boolean fixedMenuAspectRatio()
+	{
+		return stretchedModeConfig.fixedMenuAspectRatio();
+	}
+
+	/**
 	 * Content scale applied after the outer stretch transform for interface overlays.
 	 * Fixed size: 1/stretch (cancel stretch on size). Otherwise: 1 (scale with stretch).
 	 * Also used as the canvas-space visual size factor for DYNAMIC overlays.
