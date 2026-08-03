@@ -101,7 +101,8 @@ class WorldHopperPingOverlay extends Overlay
 
 		final FontMetrics fm = graphics.getFontMetrics();
 		final int textHeight = fm.getAscent() - fm.getDescent();
-		final int width = (int) client.getRealDimensions().getWidth();
+		// Content-space width so panel scale (size/aspect) keeps this flush-right.
+		final int width = OverlayUtil.getContentSpaceWidth(graphics, (int) client.getRealDimensions().getWidth());
 		// Stack under FPS when that indicator is visible; otherwise occupy the top row.
 		final int y = isFpsIndicatorShown()
 			? Y_OFFSET + fm.getHeight() + textHeight

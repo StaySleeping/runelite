@@ -449,6 +449,21 @@ public class OverlayUtil
 	}
 
 	/**
+	 * Width of the drawable area in the current native content-scale user space.
+	 * Right-aligned HUD (FPS/ping) must use this after panel content scale so the
+	 * right edge stays flush when {@code cx != 1} (e.g. fixed overlay aspect ratio).
+	 */
+	public static int getContentSpaceWidth(Graphics2D graphics, int canvasWidth)
+	{
+		double cx = getNativeVisualSizeFactor(graphics);
+		if (cx == 0.0 || cx == 1.0)
+		{
+			return canvasWidth;
+		}
+		return Math.max(1, (int) Math.round(canvasWidth / cx));
+	}
+
+	/**
 	 * @return previous value
 	 */
 	public static boolean setCurrentOverlayNative(boolean nativePass)
