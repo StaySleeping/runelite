@@ -140,6 +140,15 @@ public class NativeOverlayBuffer
 	}
 
 	/**
+	 * When true (and fixed overlay size is off), interface overlays scale uniformly
+	 * to the game/canvas aspect instead of matching a non-uniform window stretch.
+	 */
+	public boolean fixedOverlayAspectRatio()
+	{
+		return stretchedModeConfig.fixedOverlayAspectRatio();
+	}
+
+	/**
 	 * When true, the deferred right-click menu keeps canvas (unstretched) size.
 	 */
 	public boolean fixedMenuSize()
@@ -156,11 +165,48 @@ public class NativeOverlayBuffer
 	}
 
 	/**
-	 * Content scale applied after the outer stretch transform for interface overlays.
-	 * Fixed size: 1/stretch (cancel stretch on size). Otherwise: 1 (scale with stretch).
-	 * Also used as the canvas-space visual size factor for DYNAMIC overlays.
+	 * Content scale applied after the outer stretch transform for interface overlays
+	 * (infoboxes, panels, tooltips). Fixed size cancels stretch; fixed aspect uses
+	 * uniform {@code min(sx, sy)}; otherwise scale with the window.
 	 */
 	public double getPanelContentScaleX()
+	{
+		if (fixedOverlaySize())
+		{
+			double sx = getScaleX();
+			return 1 / (sx == 0 ? 1 : sx);
+		}
+		if (fixedOverlayAspectRatio())
+		{
+			double sx = getScaleX();
+			double s = Math.min(sx, getScaleY());
+			return (sx == 0 ? 1 : s / sx);
+		}
+		return 1;
+	}
+
+	public double getPanelContentScaleY()
+	{
+		if (fixedOverlaySize())
+		{
+			double sy = getScaleY();
+			return 1 / (sy == 0 ? 1 : sy);
+		}
+		if (fixedOverlayAspectRatio())
+		{
+			double sy = getScaleY();
+			double s = Math.min(getScaleX(), sy);
+			return (sy == 0 ? 1 : s / sy);
+		}
+		return 1;
+	}
+
+	/**
+	 * Content scale for world/DYNAMIC decorations: only cancels stretch when
+	 * {@link #fixedOverlaySize()} is on. Ignores fixed overlay aspect ratio so
+	 * object-tied overlays stay aligned with the stretched scene.
+	 */
+	public double getFixedSizeContentScaleX()
 	{
 		if (fixedOverlaySize())
 		{
@@ -170,7 +216,7 @@ public class NativeOverlayBuffer
 		return 1;
 	}
 
-	public double getPanelContentScaleY()
+	public double getFixedSizeContentScaleY()
 	{
 		if (fixedOverlaySize())
 		{

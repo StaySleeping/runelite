@@ -394,10 +394,18 @@ public class OverlayRenderer extends MouseAdapter
 				{
 					if (overlayNative)
 					{
-						// Widget-item overlays must match stretched inventory/UI size, not Fixed overlay size.
+						// Widget-item overlays must match stretched inventory/UI size.
+						// DYNAMIC/world overlays only honour fixed overlay size (not aspect).
 						if (overlay instanceof WidgetItemOverlay)
 						{
 							OverlayUtil.setNativeOverlayProperties(drawGraphics, 1.0, 1.0, true);
+						}
+						else if (overlayPosition == OverlayPosition.DYNAMIC || overlayPosition == OverlayPosition.DETACHED)
+						{
+							OverlayUtil.setNativeOverlayProperties(drawGraphics,
+								nativeOverlayBuffer.getFixedSizeContentScaleX(),
+								nativeOverlayBuffer.getFixedSizeContentScaleY(),
+								true);
 						}
 						else
 						{
@@ -918,8 +926,8 @@ public class OverlayRenderer extends MouseAdapter
 		{
 			if (nativePass && !(overlay instanceof WidgetItemOverlay))
 			{
-				// Fixed overlay size: cancel stretch on glyphs. Otherwise keep full size.
-				float factor = (float) nativeOverlayBuffer.getPanelContentScaleX();
+				// Fixed overlay size: cancel stretch on glyphs. Aspect correction is panels-only.
+				float factor = (float) nativeOverlayBuffer.getFixedSizeContentScaleX();
 				if (factor != 1.0f)
 				{
 					graphics.setFont(font.deriveFont(font.getSize2D() * factor));

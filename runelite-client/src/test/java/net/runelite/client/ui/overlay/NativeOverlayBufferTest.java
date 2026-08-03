@@ -225,10 +225,40 @@ public class NativeOverlayBufferTest
 		assertEquals(2.0, buffer.getScaleX(), 0.0);
 		assertEquals(2.0, buffer.getScaleY(), 0.0);
 		assertEquals(1.0, buffer.getPanelContentScaleX(), 0.0);
+		assertEquals(1.0, buffer.getFixedSizeContentScaleX(), 0.0);
 
 		when(stretchedModeConfig.fixedOverlaySize()).thenReturn(true);
 		assertEquals(0.5, buffer.getPanelContentScaleX(), 0.0);
 		assertEquals(0.5, buffer.getPanelContentScaleY(), 0.0);
+		assertEquals(0.5, buffer.getFixedSizeContentScaleX(), 0.0);
+		assertEquals(0.5, buffer.getFixedSizeContentScaleY(), 0.0);
+	}
+
+	@Test
+	public void panelContentScale_fixedAspectNonUniform()
+	{
+		when(client.getStretchedDimensions()).thenReturn(new Dimension(300, 160));
+		when(stretchedModeConfig.fixedOverlayAspectRatio()).thenReturn(true);
+
+		// sx=3, sy=2, s=min=2 → content (2/3, 1)
+		assertEquals(2.0 / 3.0, buffer.getPanelContentScaleX(), 1e-9);
+		assertEquals(1.0, buffer.getPanelContentScaleY(), 1e-9);
+		// World/DYNAMIC path ignores aspect
+		assertEquals(1.0, buffer.getFixedSizeContentScaleX(), 0.0);
+		assertEquals(1.0, buffer.getFixedSizeContentScaleY(), 0.0);
+	}
+
+	@Test
+	public void panelContentScale_fixedSizeWinsOverAspect()
+	{
+		when(client.getStretchedDimensions()).thenReturn(new Dimension(300, 160));
+		when(stretchedModeConfig.fixedOverlaySize()).thenReturn(true);
+		when(stretchedModeConfig.fixedOverlayAspectRatio()).thenReturn(true);
+
+		assertEquals(1.0 / 3.0, buffer.getPanelContentScaleX(), 1e-9);
+		assertEquals(0.5, buffer.getPanelContentScaleY(), 1e-9);
+		assertEquals(1.0 / 3.0, buffer.getFixedSizeContentScaleX(), 1e-9);
+		assertEquals(0.5, buffer.getFixedSizeContentScaleY(), 1e-9);
 	}
 
 	@Test
