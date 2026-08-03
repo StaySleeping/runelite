@@ -68,6 +68,7 @@ public class PlayerIndicatorsMinimapOverlay extends Overlay
 
 			if (minimapLocation != null)
 			{
+				minimapLocation = OverlayUtil.adjustLocalTextScaleLocation(graphics, minimapLocation, name);
 				OverlayUtil.renderTextLocation(graphics, minimapLocation, name, decorations.getColor());
 			}
 		}

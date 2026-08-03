@@ -494,6 +494,26 @@ public class OverlayUtil
 	}
 
 	/**
+	 * Shift a canvas text location so left-aligned {@code drawString} stays centered when
+	 * {@link #isNativeLocalTextScale} shrinks glyph width by the X size factor.
+	 */
+	public static Point adjustLocalTextScaleLocation(Graphics2D graphics, Point textLocation, String text)
+	{
+		if (textLocation == null || Strings.isNullOrEmpty(text) || !isNativeLocalTextScale(graphics))
+		{
+			return textLocation;
+		}
+		double fx = getNativeVisualSizeFactor(graphics);
+		if (fx == 1.0)
+		{
+			return textLocation;
+		}
+		int fullWidth = graphics.getFontMetrics().stringWidth(text);
+		int layoutWidth = Math.max(0, (int) Math.round(fullWidth * fx));
+		return new Point(textLocation.getX() + (fullWidth - layoutWidth) / 2, textLocation.getY());
+	}
+
+	/**
 	 * Width of the drawable area in the current native content-scale user space.
 	 * Right-aligned HUD (FPS/ping) must use this after panel content scale so the
 	 * right edge stays flush when {@code cx != 1} (e.g. fixed overlay aspect ratio).
