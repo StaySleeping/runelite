@@ -48,6 +48,7 @@ public class PlayerIndicatorsMinimapOverlay extends Overlay
 		setLayer(OverlayLayer.ABOVE_WIDGETS);
 		setPosition(OverlayPosition.DYNAMIC);
 		setPriority(PRIORITY_HIGH);
+		setPreferPanelGlyphScale(true);
 	}
 
 	@Override

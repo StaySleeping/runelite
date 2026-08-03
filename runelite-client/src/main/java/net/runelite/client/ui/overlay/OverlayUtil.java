@@ -80,6 +80,20 @@ public class OverlayUtil
 		}
 	};
 
+	/**
+	 * When true, {@link #renderTextLocation} / {@link net.runelite.client.ui.overlay.components.TextComponent}
+	 * apply {@link #KEY_NATIVE_VISUAL_SIZE_FACTOR} locally around each glyph draw so world-anchored
+	 * text can use panel size/aspect scales without shifting canvas positions.
+	 */
+	public static final RenderingHints.Key KEY_NATIVE_LOCAL_TEXT_SCALE = new RenderingHints.Key(0x4e4f4c54)
+	{
+		@Override
+		public boolean isCompatibleValue(Object val)
+		{
+			return val instanceof Boolean;
+		}
+	};
+
 	public static void renderPolygon(Graphics2D graphics, Shape poly, Color color)
 	{
 		renderPolygon(graphics, poly, color, new BasicStroke(2));
@@ -242,12 +256,30 @@ public class OverlayUtil
 
 		int x = txtLoc.getX();
 		int y = txtLoc.getY();
-		float shadow = (float) getNativeVisualSizeFactor(graphics);
+		final Color textColor = ColorUtil.colorWithAlpha(color, 0xFF);
 
+		if (isNativeLocalTextScale(graphics))
+		{
+			double fx = getNativeVisualSizeFactor(graphics);
+			double fy = getNativeVisualSizeFactorY(graphics);
+			if (fx != 1.0 || fy != 1.0)
+			{
+				AffineTransform transform = graphics.getTransform();
+				graphics.translate(x, y);
+				graphics.scale(fx, fy);
+				graphics.setColor(Color.BLACK);
+				graphics.drawString(text, 1, 1);
+				graphics.setColor(textColor);
+				graphics.drawString(text, 0, 0);
+				graphics.setTransform(transform);
+				return;
+			}
+		}
+
+		float shadow = (float) getNativeVisualSizeFactor(graphics);
 		graphics.setColor(Color.BLACK);
 		graphics.drawString(text, x + shadow, y + shadow);
-
-		graphics.setColor(ColorUtil.colorWithAlpha(color, 0xFF));
+		graphics.setColor(textColor);
 		graphics.drawString(text, x, y);
 	}
 
@@ -417,15 +449,28 @@ public class OverlayUtil
 	 */
 	public static void setNativeOverlayProperties(Graphics2D graphics, double visualSizeFactorX, double visualSizeFactorY)
 	{
-		setNativeOverlayProperties(graphics, visualSizeFactorX, visualSizeFactorY, true);
+		setNativeOverlayProperties(graphics, visualSizeFactorX, visualSizeFactorY, true, false);
 	}
 
 	public static void setNativeOverlayProperties(Graphics2D graphics, double visualSizeFactorX, double visualSizeFactorY,
 		boolean antialias)
 	{
+		setNativeOverlayProperties(graphics, visualSizeFactorX, visualSizeFactorY, antialias, false);
+	}
+
+	public static void setNativeOverlayProperties(Graphics2D graphics, double visualSizeFactorX, double visualSizeFactorY,
+		boolean antialias, boolean localTextScale)
+	{
 		setGraphicProperties(graphics, antialias);
 		graphics.setRenderingHint(KEY_NATIVE_VISUAL_SIZE_FACTOR, visualSizeFactorX);
 		graphics.setRenderingHint(KEY_NATIVE_VISUAL_SIZE_FACTOR_Y, visualSizeFactorY);
+		graphics.setRenderingHint(KEY_NATIVE_LOCAL_TEXT_SCALE, localTextScale);
+	}
+
+	public static boolean isNativeLocalTextScale(Graphics2D graphics)
+	{
+		Object value = graphics.getRenderingHint(KEY_NATIVE_LOCAL_TEXT_SCALE);
+		return Boolean.TRUE.equals(value);
 	}
 
 	public static double getNativeVisualSizeFactor(Graphics2D graphics)

@@ -30,10 +30,12 @@ import java.awt.Font;
 import java.awt.FontMetrics;
 import java.awt.Graphics2D;
 import java.awt.Point;
+import java.awt.geom.AffineTransform;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import javax.annotation.Nullable;
 import lombok.Setter;
+import net.runelite.client.ui.overlay.OverlayUtil;
 import net.runelite.client.ui.overlay.RenderableEntity;
 
 public class TextComponent implements RenderableEntity
@@ -78,6 +80,27 @@ public class TextComponent implements RenderableEntity
 
 		final FontMetrics fontMetrics = graphics.getFontMetrics();
 
+		AffineTransform transform = null;
+		int baseX = positionX;
+		int baseY = positionY;
+		double layoutScaleX = 1.0;
+		double layoutScaleY = 1.0;
+		if (OverlayUtil.isNativeLocalTextScale(graphics))
+		{
+			double fx = OverlayUtil.getNativeVisualSizeFactor(graphics);
+			double fy = OverlayUtil.getNativeVisualSizeFactorY(graphics);
+			if (fx != 1.0 || fy != 1.0)
+			{
+				transform = graphics.getTransform();
+				graphics.translate(positionX, positionY);
+				graphics.scale(fx, fy);
+				baseX = 0;
+				baseY = 0;
+				layoutScaleX = fx;
+				layoutScaleY = fy;
+			}
+		}
+
 		Matcher matcher = COL_TAG_PATTERN.matcher(text);
 		Color textColor = color;
 		int idx = 0;
@@ -88,7 +111,7 @@ public class TextComponent implements RenderableEntity
 			String s = text.substring(idx, matcher.start());
 			idx = matcher.end();
 
-			renderText(graphics, textColor, positionX + width, positionY, s);
+			renderText(graphics, textColor, baseX + width, baseY, s);
 			width += fontMetrics.stringWidth(s);
 
 			textColor = Color.decode("#" + color);
@@ -96,11 +119,18 @@ public class TextComponent implements RenderableEntity
 
 		{
 			String s = text.substring(idx);
-			renderText(graphics, textColor, positionX + width, positionY, s);
+			renderText(graphics, textColor, baseX + width, baseY, s);
 			width += fontMetrics.stringWidth(s);
 		}
 
 		int height = fontMetrics.getHeight();
+
+		if (transform != null)
+		{
+			graphics.setTransform(transform);
+			width = Math.max(1, (int) Math.round(width * layoutScaleX));
+			height = Math.max(1, (int) Math.round(height * layoutScaleY));
+		}
 
 		if (originalFont != null)
 		{

@@ -92,7 +92,7 @@ public interface StretchedModeConfig extends Config
 	@ConfigItem(
 		keyName = "fixedOverlayAspectRatio",
 		name = "Fixed overlay aspect ratio",
-		description = "Keep interface overlays (infoboxes, panels, tooltips, FPS/ping) at the game's aspect ratio instead of matching a non-uniform window stretch. Only applies when horizontal and vertical stretch differ (typically with Keep aspect ratio off). Does not affect world or inventory overlays. With Fixed overlay size on, forces true canvas 1×1 pixels.",
+		description = "Keep interface overlays (infoboxes, panels, tooltips, FPS/ping) and world HUD text (player indicators, ground items) at the game's aspect ratio instead of matching a non-uniform window stretch. Only applies when horizontal and vertical stretch differ (typically with Keep aspect ratio off). Does not affect world geometry or inventory overlays. With Fixed overlay size on, forces true canvas 1×1 pixels.",
 		position = 5
 	)
 	default boolean fixedOverlayAspectRatio()

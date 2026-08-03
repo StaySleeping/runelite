@@ -58,6 +58,7 @@ public class PlayerIndicatorsOverlay extends Overlay
 		this.chatIconManager = chatIconManager;
 		setPosition(OverlayPosition.DYNAMIC);
 		setPriority(PRIORITY_MED);
+		setPreferPanelGlyphScale(true);
 	}
 
 	@Override
@@ -138,7 +139,9 @@ public class PlayerIndicatorsOverlay extends Overlay
 				imageNegativeMargin = imageWidth / 2;
 			}
 
-			final int textHeight = graphics.getFontMetrics().getHeight() - graphics.getFontMetrics().getMaxDescent();
+			final int textHeight = (int) Math.round(
+				(graphics.getFontMetrics().getHeight() - graphics.getFontMetrics().getMaxDescent())
+					* OverlayUtil.getNativeVisualSizeFactorY(graphics));
 			final Point imageLocation = new Point(textLocation.getX() - imageNegativeMargin - 1, textLocation.getY() - textHeight / 2 - imageHeight / 2);
 			OverlayUtil.renderImageLocationExact(graphics, imageLocation, rankImage);
 

@@ -397,16 +397,18 @@ public class OverlayRenderer extends MouseAdapter
 						// Widget-item overlays must match stretched inventory/UI size.
 						// World DYNAMIC overlays only honour fixed overlay size (not aspect).
 						// HUD DYNAMIC overlays (FPS/ping) opt into panel size/aspect scaling.
+						// World text (player names, ground items) uses panel scales on glyphs only.
 						if (overlay instanceof WidgetItemOverlay)
 						{
 							OverlayUtil.setNativeOverlayProperties(drawGraphics, 1.0, 1.0, true);
 						}
-						else if (overlay.isPreferPanelContentScale())
+						else if (overlay.isPreferPanelContentScale() || overlay.isPreferPanelGlyphScale())
 						{
 							OverlayUtil.setNativeOverlayProperties(drawGraphics,
 								nativeOverlayBuffer.getPanelContentScaleX(),
 								nativeOverlayBuffer.getPanelContentScaleY(),
-								true);
+								true,
+								overlay.isPreferPanelGlyphScale());
 						}
 						else if (overlayPosition == OverlayPosition.DYNAMIC || overlayPosition == OverlayPosition.DETACHED)
 						{
@@ -932,7 +934,9 @@ public class OverlayRenderer extends MouseAdapter
 		// Set font based on configuration
 		if (position == OverlayPosition.DYNAMIC || position == OverlayPosition.DETACHED)
 		{
-			if (nativePass && !(overlay instanceof WidgetItemOverlay) && !overlay.isPreferPanelContentScale())
+			if (nativePass && !(overlay instanceof WidgetItemOverlay)
+				&& !overlay.isPreferPanelContentScale()
+				&& !overlay.isPreferPanelGlyphScale())
 			{
 				// World DYNAMIC: fixed overlay size cancels stretch on glyphs only.
 				final float factor = (float) nativeOverlayBuffer.getFixedSizeContentScaleX();
@@ -947,7 +951,7 @@ public class OverlayRenderer extends MouseAdapter
 			}
 			else
 			{
-				// Including preferPanelContentScale HUD: font scales via graphics.scale below.
+				// Panel content scale / glyph scale: font size via graphics.scale or local text scale.
 				graphics.setFont(font);
 			}
 		}

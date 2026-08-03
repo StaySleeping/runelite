@@ -89,6 +89,7 @@ public class GroundItemsOverlay extends Overlay
 	{
 		setPosition(OverlayPosition.DYNAMIC);
 		setLayer(OverlayLayer.ABOVE_SCENE);
+		setPreferPanelGlyphScale(true);
 		this.client = client;
 		this.plugin = plugin;
 		this.config = config;
@@ -285,13 +286,19 @@ public class GroundItemsOverlay extends Overlay
 				? item.getOffset()
 				: offsetMap.compute(item.getItemLayer().getWorldLocation(), (k, v) -> v != null ? v + 1 : 0);
 
+			final double textScaleX = OverlayUtil.isNativeLocalTextScale(graphics)
+				? OverlayUtil.getNativeVisualSizeFactor(graphics) : 1.0;
+			final double textScaleY = OverlayUtil.isNativeLocalTextScale(graphics)
+				? OverlayUtil.getNativeVisualSizeFactorY(graphics) : 1.0;
+			final int stringGap = Math.max(1, (int) Math.round(STRING_GAP * textScaleY));
+
 			final int textX = textPoint.getX();
-			final int textY = textPoint.getY() - (STRING_GAP * offset);
+			final int textY = textPoint.getY() - (stringGap * offset);
 
 			if (plugin.isHotKeyPressed())
 			{
-				final int stringWidth = fm.stringWidth(itemString);
-				final int stringHeight = fm.getHeight();
+				final int stringWidth = Math.max(1, (int) Math.round(fm.stringWidth(itemString) * textScaleX));
+				final int stringHeight = Math.max(1, (int) Math.round(fm.getHeight() * textScaleY));
 
 				// Item bounds
 				int x = textX - 2;
@@ -373,7 +380,9 @@ public class GroundItemsOverlay extends Overlay
 					textComponent.setText(timerText);
 					textComponent.setColor(timerColor);
 					textComponent.setOutline(outline);
-					textComponent.setPosition(new java.awt.Point(textX + fm.stringWidth(itemString), textY));
+					textComponent.setPosition(new java.awt.Point(
+						textX + Math.max(1, (int) Math.round(fm.stringWidth(itemString) * textScaleX)),
+						textY));
 					textComponent.render(graphics);
 				}
 			}
