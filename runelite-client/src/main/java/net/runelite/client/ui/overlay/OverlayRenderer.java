@@ -262,16 +262,14 @@ public class OverlayRenderer extends MouseAdapter
 	public void renderOverlayLayer(Graphics2D graphics, final OverlayLayer layer)
 	{
 		final Collection<Overlay> overlays = overlayManager.getLayer(layer);
-		renderOverlays(graphics, overlays, layer, true);
+		renderOverlays(graphics, overlays, layer);
 	}
 
 	public void renderAfterInterface(Graphics2D graphics, int interfaceId, Collection<WidgetItem> widgetItems)
 	{
 		Collection<Overlay> overlays = overlayManager.getForInterface(interfaceId);
 		overlayManager.setWidgetItems(widgetItems);
-		// Mid-UI hooks stay native when the menu is closed. While open, paint into the UI
-		// buffer so the translucent right-click menu composites over them.
-		renderOverlays(graphics, overlays, OverlayLayer.ABOVE_WIDGETS, !client.isMenuOpen());
+		renderOverlays(graphics, overlays, OverlayLayer.ABOVE_WIDGETS);
 		overlayManager.setWidgetItems(Collections.emptyList());
 	}
 
@@ -279,14 +277,11 @@ public class OverlayRenderer extends MouseAdapter
 	{
 		Collection<Overlay> overlays = overlayManager.getForLayer(layer.getId());
 		overlayManager.setWidgetItems(widgetItems);
-		// Mid-UI hooks stay native when the menu is closed. While open, paint into the UI
-		// buffer so the translucent right-click menu composites over them.
-		renderOverlays(graphics, overlays, OverlayLayer.ABOVE_WIDGETS, !client.isMenuOpen());
+		renderOverlays(graphics, overlays, OverlayLayer.ABOVE_WIDGETS);
 		overlayManager.setWidgetItems(Collections.emptyList());
 	}
 
-	private void renderOverlays(final Graphics2D graphics, Collection<Overlay> overlays, final OverlayLayer layer,
-		boolean allowNative)
+	private void renderOverlays(final Graphics2D graphics, Collection<Overlay> overlays, final OverlayLayer layer)
 	{
 		if (overlays == null
 			|| overlays.isEmpty()
@@ -316,7 +311,7 @@ public class OverlayRenderer extends MouseAdapter
 		{
 			for (Overlay overlay : overlays)
 			{
-				final boolean overlayNative = allowNative && shouldUseNativePass(overlay, layer);
+				final boolean overlayNative = shouldUseNativePass(overlay, layer);
 				final boolean shapeAntialias = overlayNative
 					|| !overlay.isPreferUiPixelGrid()
 					|| !isGpuUiNearest();
