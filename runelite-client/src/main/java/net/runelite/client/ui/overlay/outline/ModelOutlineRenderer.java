@@ -540,6 +540,7 @@ public class ModelOutlineRenderer
 			model.getVerticesX(), model.getVerticesZ(), model.getVerticesY(),
 			projectedVerticesX, projectedVerticesY);
 
+		final boolean scaleToDisplay = nativePass && (scaleX != 1.0 || scaleY != 1.0);
 		boolean anyVisible = false;
 
 		for (int i = 0; i < vertexCount; i++)
@@ -549,6 +550,14 @@ public class ModelOutlineRenderer
 
 			if (y != Integer.MIN_VALUE)
 			{
+				if (scaleToDisplay)
+				{
+					x = (int) Math.round(x * scaleX);
+					y = (int) Math.round(y * scaleY);
+					projectedVerticesX[i] = x;
+					projectedVerticesY[i] = y;
+				}
+
 				boolean visibleX = x >= clipX1 && x < clipX2;
 				boolean visibleY = y >= clipY1 && y < clipY2;
 				anyVisible |= visibleX && visibleY;
@@ -606,61 +615,25 @@ public class ModelOutlineRenderer
 	}
 
 	/**
-	 * Writes an opaque/replace outline sample at canvas-space (x, y). Under native
-	 * overlays this fills the corresponding stretch-scale pixel block so the outline
-	 * lines up with the scene without running silhouette math at display resolution.
+	 * Writes an opaque/replace outline sample at (x, y). Coordinates are canvas-space
+	 * for the CPU path, or display-space when {@link #nativePass} has already scaled
+	 * the silhouette into the native UNDER_UI buffer.
 	 */
 	private void writeOutlinePixel(int[] imageData, int imageWidth, int imageHeight, int x, int y, int color)
 	{
-		if (!nativePass || (scaleX == 1.0 && scaleY == 1.0))
+		if (x >= 0 && y >= 0 && x < imageWidth && y < imageHeight)
 		{
-			if (x >= 0 && y >= 0 && x < imageWidth && y < imageHeight)
-			{
-				imageData[y * imageWidth + x] = color;
-			}
-			return;
-		}
-
-		int x0 = (int) Math.round(x * scaleX);
-		int y0 = (int) Math.round(y * scaleY);
-		int x1 = Math.max(x0 + 1, (int) Math.round((x + 1) * scaleX));
-		int y1 = Math.max(y0 + 1, (int) Math.round((y + 1) * scaleY));
-
-		for (int py = y0; py < y1; py++)
-		{
-			if (py < 0 || py >= imageHeight)
-			{
-				continue;
-			}
-			int row = py * imageWidth;
-			for (int px = x0; px < x1; px++)
-			{
-				if (px >= 0 && px < imageWidth)
-				{
-					imageData[row + px] = color;
-				}
-			}
+			imageData[y * imageWidth + x] = color;
 		}
 	}
 
 	private int readOutlinePixel(int[] imageData, int imageWidth, int imageHeight, int x, int y)
 	{
-		if (!nativePass || (scaleX == 1.0 && scaleY == 1.0))
-		{
-			if (x < 0 || y < 0 || x >= imageWidth || y >= imageHeight)
-			{
-				return 0;
-			}
-			return imageData[y * imageWidth + x];
-		}
-
-		int px = (int) Math.round(x * scaleX);
-		int py = (int) Math.round(y * scaleY);
-		if (px < 0 || py < 0 || px >= imageWidth || py >= imageHeight)
+		if (x < 0 || y < 0 || x >= imageWidth || y >= imageHeight)
 		{
 			return 0;
 		}
-		return imageData[py * imageWidth + px];
+		return imageData[y * imageWidth + x];
 	}
 
 	private void blendOutlinePixel(int[] imageData, int imageWidth, int imageHeight, int x, int y, int colorARGB, int inverseAlpha)
@@ -1084,12 +1057,27 @@ public class ModelOutlineRenderer
 			scaleY = 1;
 		}
 
-		// Rasterize in canvas space (same as modelToCanvas). Native stretch is applied
-		// only when writing pixels so fixed-point silhouette math stays valid.
-		clipX1 = client.getViewportXOffset();
-		clipY1 = client.getViewportYOffset();
-		clipX2 = client.getViewportWidth() + clipX1;
-		clipY2 = client.getViewportHeight() + clipY1;
+		// Native pass: clip and silhouette in display space so outline edges are 1x1
+		// buffer pixels. outlineWidth/feather stay as configured display pixels.
+		// CPU / non-native: canvas space into MainBufferProvider.
+		final int viewportX = client.getViewportXOffset();
+		final int viewportY = client.getViewportYOffset();
+		final int viewportW = client.getViewportWidth();
+		final int viewportH = client.getViewportHeight();
+		if (nativePass && (scaleX != 1.0 || scaleY != 1.0))
+		{
+			clipX1 = (int) Math.round(viewportX * scaleX);
+			clipY1 = (int) Math.round(viewportY * scaleY);
+			clipX2 = (int) Math.round((viewportX + viewportW) * scaleX);
+			clipY2 = (int) Math.round((viewportY + viewportH) * scaleY);
+		}
+		else
+		{
+			clipX1 = viewportX;
+			clipY1 = viewportY;
+			clipX2 = viewportW + viewportX;
+			clipY2 = viewportH + viewportY;
+		}
 
 		if (!projectVertices(wv, model, localX, localY, localZ, orientation))
 		{
