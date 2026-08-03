@@ -392,7 +392,6 @@ public class NativeOverlayMenu
 		final double s = Math.min(scaleX == 0 ? 1 : scaleX, scaleY == 0 ? 1 : scaleY);
 		final double anchorX = hasClickAnchor ? clickCanvasX : menu.x + menu.width / 2.0;
 		final double anchorYTop = hasClickAnchor ? clickCanvasY : menu.y;
-		final double anchorYCenter = hasClickAnchor ? clickCanvasY : menu.y + menu.height / 2.0;
 
 		if (fixedSize && fixedAspect)
 		{
@@ -417,7 +416,8 @@ public class NativeOverlayMenu
 			final int dw = Math.max(1, (int) Math.round(menu.width * s));
 			final int dh = Math.max(1, (int) Math.round(menu.height * s));
 			final int dx = placeCentered(anchorX, dw, scaleX, canvasWidth);
-			final int dy = placeCentered(anchorYCenter, dh, scaleY, canvasHeight);
+			// Same vertical contract as fixed-size: client lays the menu out below the click.
+			final int dy = placeTopAligned(anchorYTop, dh, scaleY, canvasHeight);
 			return new Rectangle(dx, dy, dw, dh);
 		}
 

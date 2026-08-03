@@ -64,8 +64,16 @@ public class NativeOverlayMenuTest
 	@Test
 	public void computeMenuDest_fixedAspectNonUniform()
 	{
-		// s = min(3, 2) = 2; center on stretched center (40+50)*3=270, (20+25)*2=90
+		// s = min(3, 2) = 2; size (200,100); center X on menu center; top-align Y at menu.y*sy
 		Rectangle dest = NativeOverlayMenu.computeMenuDest(MENU, 3.0, 2.0, false, true);
+		assertEquals(new Rectangle(170, 40, 200, 100), dest);
+	}
+
+	@Test
+	public void computeMenuDest_fixedAspectTopAlignsOnClick()
+	{
+		// Aspect-only must not center vertically on the click (that floats the menu too high).
+		Rectangle dest = NativeOverlayMenu.computeMenuDest(MENU, 3.0, 2.0, false, true, 800, 600, true, 90, 20);
 		assertEquals(new Rectangle(170, 40, 200, 100), dest);
 	}
 
