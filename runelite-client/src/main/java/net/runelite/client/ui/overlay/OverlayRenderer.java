@@ -413,36 +413,80 @@ public class OverlayRenderer extends MouseAdapter
 			if (nativeGraphics != null)
 			{
 				nativeGraphics.dispose();
-				nativeOverlayBuffer.markDirty(NativeOverlayBuffer.Pass.UNDER_UI);
+				nativeOverlayBuffer.markDirty(nativeOverlayBuffer.passForLayer(layer));
 			}
 		}
 	}
 
 	/**
-	 * Graphics2D into the native overlay buffer for layers composited under the game UI.
-	 * Overlays keep drawing in canvas coordinates but rasterize at display resolution.
+	 * Whether this layer draws into a native overlay buffer. On CPU only above-UI layers
+	 * can: the software frame already merges scene and widgets, so an under-UI composite
+	 * would draw on top of interfaces.
+	 */
+	private boolean shouldUseNativePass(final OverlayLayer layer)
+	{
+		return nativeOverlayBuffer.isActive()
+			&& (client.isGpu() || NativeOverlayBuffer.isAboveUiLayer(layer));
+	}
+
+	/**
+	 * Graphics2D into the native overlay buffer for this layer's pass. Overlays keep
+	 * drawing in canvas coordinates but rasterize at display resolution.
 	 *
-	 * @return null when this layer does not use the native buffer
+	 * @return null when this layer does not use a native buffer
 	 */
 	private Graphics2D createNativeGraphics(final OverlayLayer layer)
 	{
-		if (layer != OverlayLayer.ABOVE_SCENE || !nativeOverlayBuffer.isActive() || !client.isGpu())
+		if (!shouldUseNativePass(layer))
 		{
 			return null;
 		}
 
-		final BufferedImage target = nativeOverlayBuffer.getImage(NativeOverlayBuffer.Pass.UNDER_UI);
+		final BufferedImage target = nativeOverlayBuffer.getImage(nativeOverlayBuffer.passForLayer(layer));
 		if (target == null)
 		{
 			return null;
 		}
 
+		return createScaledGraphics(target);
+	}
+
+	private Graphics2D createScaledGraphics(final BufferedImage target)
+	{
 		final double sx = nativeOverlayBuffer.getScaleX();
 		final double sy = nativeOverlayBuffer.getScaleY();
 		final Graphics2D nativeGraphics = target.createGraphics();
 		nativeGraphics.scale(sx, sy);
 		nativeGraphics.setStroke(new BasicStroke((float) (1 / Math.max(sx, sy))));
 		return nativeGraphics;
+	}
+
+	/**
+	 * Graphics2D into the above-UI native overlay buffer for callers outside the overlay
+	 * layers (notifier flash, client UI overlays). Caller must dispose and mark dirty.
+	 *
+	 * @return null when the native buffer is inactive
+	 */
+	public Graphics2D createNativeOverlayGraphics()
+	{
+		if (!nativeOverlayBuffer.isActive())
+		{
+			return null;
+		}
+
+		nativeOverlayBuffer.prepareFrame();
+		final BufferedImage target = nativeOverlayBuffer.getImage(NativeOverlayBuffer.Pass.ABOVE_UI);
+		if (target == null)
+		{
+			return null;
+		}
+
+		return createScaledGraphics(target);
+	}
+
+	public NativeOverlayBuffer getNativeOverlayBuffer()
+	{
+		return nativeOverlayBuffer;
 	}
 
 	@Override

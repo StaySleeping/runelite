@@ -1541,6 +1541,7 @@ public class GpuPlugin extends Plugin implements DrawCallbacks
 		// Texture on UI — under-UI overlays sit between scene and interfaces (bank, etc.)
 		drawNativeOverlays(NativeOverlayBuffer.Pass.UNDER_UI);
 		drawUi(overlayColor, canvasHeight, canvasWidth);
+		drawNativeOverlays(NativeOverlayBuffer.Pass.ABOVE_UI);
 
 		try
 		{
@@ -1634,7 +1635,7 @@ public class GpuPlugin extends Plugin implements DrawCallbacks
 
 	/**
 	 * Composite a native-resolution overlay pass. UNDER_UI is drawn before the stretched
-	 * game UI, matching OverlayLayer under-widget ordering.
+	 * game UI; ABOVE_UI after — matching OverlayLayer under/above widget ordering.
 	 */
 	private void drawNativeOverlays(NativeOverlayBuffer.Pass pass)
 	{

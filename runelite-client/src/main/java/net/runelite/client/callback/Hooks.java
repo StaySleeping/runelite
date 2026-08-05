@@ -24,6 +24,7 @@
  */
 package net.runelite.client.callback;
 
+import java.awt.AlphaComposite;
 import java.awt.Dimension;
 import java.awt.Graphics;
 import java.awt.Graphics2D;
@@ -81,6 +82,7 @@ import net.runelite.client.plugins.PluginManager;
 import net.runelite.client.task.Scheduler;
 import net.runelite.client.ui.ClientUI;
 import net.runelite.client.ui.DrawManager;
+import net.runelite.client.ui.overlay.NativeOverlayBuffer;
 import net.runelite.client.ui.overlay.OverlayLayer;
 import net.runelite.client.ui.overlay.OverlayRenderer;
 import net.runelite.client.ui.overlay.infobox.InfoBoxManager;
@@ -403,10 +405,26 @@ public class Hooks implements Callbacks
 			log.error("Error during overlay rendering", ex);
 		}
 
-		notifier.processFlash(graphics2d);
+		Graphics2D overlayGraphics = renderer.createNativeOverlayGraphics();
+		try
+		{
+			// Draw the flash and clientUI overlays
+			Graphics2D targetGraphics = overlayGraphics != null ? overlayGraphics : graphics2d;
+			notifier.processFlash(targetGraphics);
+			clientUi.paintOverlays(targetGraphics);
 
-		// Draw clientUI overlays
-		clientUi.paintOverlays(graphics2d);
+			if (overlayGraphics != null)
+			{
+				renderer.getNativeOverlayBuffer().markDirty(NativeOverlayBuffer.Pass.ABOVE_UI);
+			}
+		}
+		finally
+		{
+			if (overlayGraphics != null)
+			{
+				overlayGraphics.dispose();
+			}
+		}
 
 		if (client.isGpu())
 		{
@@ -460,6 +478,20 @@ public class Hooks implements Callbacks
 					? RenderingHints.VALUE_INTERPOLATION_NEAREST_NEIGHBOR
 					: RenderingHints.VALUE_INTERPOLATION_BILINEAR);
 			stretchedGraphics.drawImage(image, 0, 0, stretchedDimensions.width, stretchedDimensions.height, null);
+
+			// Under-UI overlays stay in the canvas on the CPU path so the bank covers them.
+			// Only above-UI overlays are composited here, after the stretch upscale.
+			var nativeBuffer = renderer.getNativeOverlayBuffer();
+			if (nativeBuffer.isActive() && nativeBuffer.isDirty(NativeOverlayBuffer.Pass.ABOVE_UI))
+			{
+				BufferedImage above = nativeBuffer.getImage(NativeOverlayBuffer.Pass.ABOVE_UI);
+				if (above != null)
+				{
+					stretchedGraphics.setComposite(AlphaComposite.SrcOver);
+					stretchedGraphics.drawImage(above, 0, 0, null);
+					nativeBuffer.finishComposite(NativeOverlayBuffer.Pass.ABOVE_UI);
+				}
+			}
 
 			finalImage = stretchedImage;
 		}

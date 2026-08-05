@@ -34,13 +34,17 @@ import javax.inject.Singleton;
 import net.runelite.api.Client;
 
 /**
- * Offscreen buffer for drawing RuneLite overlays at stretched (display) resolution
+ * Offscreen buffers for drawing RuneLite overlays at stretched (display) resolution
  * so they are not upscaled with the game UI.
+ * <p>
+ * Two passes mirror {@link OverlayLayer} ordering relative to game interfaces:
+ * under-UI ({@link OverlayLayer#ABOVE_SCENE}, {@link OverlayLayer#UNDER_WIDGETS})
+ * and above-UI ({@link OverlayLayer#ABOVE_WIDGETS}, {@link OverlayLayer#ALWAYS_ON_TOP}).
  * <p>
  * Inactive when stretched mode is off, or when stretch does not actually upscale
  * (stretched size equals canvas) — then the legacy single-buffer path is enough.
- * The buffer is fully cleared once per frame; compositors upload it when the pass
- * was touched (or to push a clear after prior content).
+ * Each pass is fully cleared once per frame; compositors upload the full buffer
+ * when the pass was touched (or to push a clear after prior content).
  */
 @Singleton
 public class NativeOverlayBuffer
@@ -50,17 +54,23 @@ public class NativeOverlayBuffer
 		/**
 		 * Drawn after the scene and before the game UI (bank, inventory, etc.).
 		 */
-		UNDER_UI
+		UNDER_UI,
+		/**
+		 * Drawn after the game UI (tooltips, overlays moved over interfaces, etc.).
+		 */
+		ABOVE_UI
 	}
 
 	private final Client client;
 
 	private BufferedImage underImage;
+	private BufferedImage aboveImage;
 	private int[] uploadScratch;
 	private int frameId;
 	private int preparedFrameId = -1;
 
 	private final PassState under = new PassState();
+	private final PassState above = new PassState();
 
 	@Inject
 	private NativeOverlayBuffer(Client client)
@@ -69,7 +79,7 @@ public class NativeOverlayBuffer
 	}
 
 	/**
-	 * Whether the native overlay buffer should be used. Requires stretched mode and an
+	 * Whether native overlay buffers should be used. Requires stretched mode and an
 	 * actual upscale; otherwise overlays can share the canvas buffer like before.
 	 */
 	public boolean isActive()
@@ -81,6 +91,19 @@ public class NativeOverlayBuffer
 		Dimension stretched = client.getStretchedDimensions();
 		return stretched.width > client.getCanvasWidth()
 			|| stretched.height > client.getCanvasHeight();
+	}
+
+	/**
+	 * Whether this overlay layer should be composited above the game UI.
+	 */
+	public static boolean isAboveUiLayer(OverlayLayer layer)
+	{
+		return layer == OverlayLayer.ABOVE_WIDGETS || layer == OverlayLayer.ALWAYS_ON_TOP;
+	}
+
+	public Pass passForLayer(OverlayLayer layer)
+	{
+		return isAboveUiLayer(layer) ? Pass.ABOVE_UI : Pass.UNDER_UI;
 	}
 
 	public double getScaleX()
@@ -104,9 +127,9 @@ public class NativeOverlayBuffer
 	}
 
 	/**
-	 * Ensures the buffer exists and is cleared once per client frame.
-	 * Only allocated on GPU; the software renderer already merges scene and widgets,
-	 * so an under-UI composite would draw on top of interfaces.
+	 * Ensures required buffers exist and are cleared once per client frame.
+	 * Under-UI is only allocated on GPU (CPU keeps under-UI overlays on the canvas,
+	 * since the software renderer already merges scene and widgets).
 	 */
 	public void prepareFrame()
 	{
@@ -116,9 +139,11 @@ public class NativeOverlayBuffer
 			return;
 		}
 
+		Dimension dim = client.getStretchedDimensions();
+
 		if (client.isGpu())
 		{
-			underImage = ensureImage(underImage, client.getStretchedDimensions());
+			underImage = ensureImage(underImage, dim);
 		}
 		else if (underImage != null)
 		{
@@ -126,25 +151,29 @@ public class NativeOverlayBuffer
 			under.reset();
 		}
 
+		aboveImage = ensureImage(aboveImage, dim);
+
 		if (preparedFrameId != frameId)
 		{
-			beginFrame();
+			beginFrame(Pass.UNDER_UI);
+			beginFrame(Pass.ABOVE_UI);
 			preparedFrameId = frameId;
 		}
 	}
 
-	private void beginFrame()
+	private void beginFrame(Pass pass)
 	{
-		if (underImage == null)
+		PassState state = state(pass);
+		if (getImage(pass) == null)
 		{
-			under.reset();
+			state.reset();
 			return;
 		}
 
-		Arrays.fill(getPixels(Pass.UNDER_UI), 0);
-		under.touched = false;
+		Arrays.fill(getPixels(pass), 0);
+		state.touched = false;
 		// hadContent from the previous finishComposite keeps isDirty true so the
-		// compositor uploads this cleared buffer once (avoids ghosted GL pixels).
+		// compositor uploads this cleared buffer once (avoids ghosted GL/CPU pixels).
 	}
 
 	private static BufferedImage ensureImage(BufferedImage image, Dimension dim)
@@ -170,12 +199,13 @@ public class NativeOverlayBuffer
 		{
 			return;
 		}
-		under.touched = true;
+		state(pass).touched = true;
 	}
 
 	public boolean isDirty(Pass pass)
 	{
-		return under.touched || under.hadContent;
+		PassState state = state(pass);
+		return state.touched || state.hadContent;
 	}
 
 	/**
@@ -192,17 +222,18 @@ public class NativeOverlayBuffer
 	}
 
 	/**
-	 * Call after a successful GPU composite so the next frame can clear this pass.
+	 * Call after a successful GPU/CPU composite so the next frame can clear this pass.
 	 */
 	public void finishComposite(Pass pass)
 	{
-		under.hadContent = under.touched;
-		under.touched = false;
+		PassState state = state(pass);
+		state.hadContent = state.touched;
+		state.touched = false;
 	}
 
 	public BufferedImage getImage(Pass pass)
 	{
-		return underImage;
+		return pass == Pass.ABOVE_UI ? aboveImage : underImage;
 	}
 
 	public int[] getPixels(Pass pass)
@@ -285,12 +316,19 @@ public class NativeOverlayBuffer
 		return uploadScratch;
 	}
 
+	private PassState state(Pass pass)
+	{
+		return pass == Pass.ABOVE_UI ? above : under;
+	}
+
 	public void release()
 	{
 		underImage = null;
+		aboveImage = null;
 		uploadScratch = null;
 		preparedFrameId = -1;
 		under.reset();
+		above.reset();
 	}
 
 	private static final class PassState
