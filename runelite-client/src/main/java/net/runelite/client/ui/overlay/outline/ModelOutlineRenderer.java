@@ -433,22 +433,24 @@ public class ModelOutlineRenderer
 			return;
 		}
 
-		int slope1 = 0;
+		// Use long fixed-point: at native/stretch resolution, int overflows on
+		// (dy * slope) for wide triangles and corrupts the silhouette (partial outlines).
+		long slope1 = 0;
 		if (y1 != y2)
 		{
-			slope1 = (x2 - x1 << 14) / (y2 - y1);
+			slope1 = ((long) (x2 - x1) << 14) / (y2 - y1);
 		}
 
-		int slope2 = 0;
+		long slope2 = 0;
 		if (y3 != y2)
 		{
-			slope2 = (x3 - x2 << 14) / (y3 - y2);
+			slope2 = ((long) (x3 - x2) << 14) / (y3 - y2);
 		}
 
-		int slope3 = 0;
+		long slope3 = 0;
 		if (y1 != y3)
 		{
-			slope3 = (x1 - x3 << 14) / (y1 - y3);
+			slope3 = ((long) (x1 - x3) << 14) / (y1 - y3);
 		}
 
 		if (y2 > clipY2)
@@ -464,19 +466,19 @@ public class ModelOutlineRenderer
 			return;
 		}
 
-		x1 <<= 14;
-		x2 <<= 14;
-		x3 = x1;
+		long x1fp = (long) x1 << 14;
+		long x2fp = (long) x2 << 14;
+		long x3fp = x1fp;
 
 		if (y1 < clipY1)
 		{
-			x3 -= (y1 - clipY1) * slope3;
-			x1 -= (y1 - clipY1) * slope1;
+			x3fp -= (long) (y1 - clipY1) * slope3;
+			x1fp -= (long) (y1 - clipY1) * slope1;
 			y1 = clipY1;
 		}
 		if (y2 < clipY1)
 		{
-			x2 -= (y2 - clipY1) * slope2;
+			x2fp -= (long) (y2 - clipY1) * slope2;
 			y2 = clipY1;
 		}
 
@@ -487,17 +489,17 @@ public class ModelOutlineRenderer
 		{
 			while (height1-- > 0)
 			{
-				simulateHorizontalLineRasterizationForOutline(pixelY, x3 >> 14, x1 >> 14);
-				x3 += slope3;
-				x1 += slope1;
+				simulateHorizontalLineRasterizationForOutline(pixelY, (int) (x3fp >> 14), (int) (x1fp >> 14));
+				x3fp += slope3;
+				x1fp += slope1;
 				pixelY++;
 			}
 
 			while (height2-- > 0)
 			{
-				simulateHorizontalLineRasterizationForOutline(pixelY, x3 >> 14, x2 >> 14);
-				x3 += slope3;
-				x2 += slope2;
+				simulateHorizontalLineRasterizationForOutline(pixelY, (int) (x3fp >> 14), (int) (x2fp >> 14));
+				x3fp += slope3;
+				x2fp += slope2;
 				pixelY++;
 			}
 		}
@@ -505,17 +507,17 @@ public class ModelOutlineRenderer
 		{
 			while (height1-- > 0)
 			{
-				simulateHorizontalLineRasterizationForOutline(pixelY, x1 >> 14, x3 >> 14);
-				x1 += slope1;
-				x3 += slope3;
+				simulateHorizontalLineRasterizationForOutline(pixelY, (int) (x1fp >> 14), (int) (x3fp >> 14));
+				x1fp += slope1;
+				x3fp += slope3;
 				pixelY++;
 			}
 
 			while (height2-- > 0)
 			{
-				simulateHorizontalLineRasterizationForOutline(pixelY, x2 >> 14, x3 >> 14);
-				x3 += slope3;
-				x2 += slope2;
+				simulateHorizontalLineRasterizationForOutline(pixelY, (int) (x2fp >> 14), (int) (x3fp >> 14));
+				x3fp += slope3;
+				x2fp += slope2;
 				pixelY++;
 			}
 		}
