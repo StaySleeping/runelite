@@ -1537,9 +1537,10 @@ public class GpuPlugin extends Plugin implements DrawCallbacks
 			blitSceneFbo();
 		}
 
-		// Texture on UI — native overlays sit between scene and interfaces (bank, etc.)
-		drawNativeOverlays();
+		// Texture on UI — under-UI overlays sit between scene and interfaces (bank, etc.)
+		drawNativeOverlays(NativeOverlayBuffer.Pass.UNDER_UI);
 		drawUi(overlayColor, canvasHeight, canvasWidth);
+		drawNativeOverlays(NativeOverlayBuffer.Pass.ABOVE_UI);
 
 		try
 		{
@@ -1632,18 +1633,18 @@ public class GpuPlugin extends Plugin implements DrawCallbacks
 	}
 
 	/**
-	 * Composite the native-resolution overlay buffer after the scene and before the
-	 * stretched game UI (OverlayLayer.ABOVE_SCENE ordering).
+	 * Composite a native-resolution overlay pass. UNDER_UI is drawn before the stretched
+	 * game UI; ABOVE_UI after — matching OverlayLayer under/above widget ordering.
 	 */
-	private void drawNativeOverlays()
+	private void drawNativeOverlays(NativeOverlayBuffer.Pass pass)
 	{
-		if (!nativeOverlayBuffer.isActive() || !nativeOverlayBuffer.isDirty())
+		if (!nativeOverlayBuffer.isActive() || !nativeOverlayBuffer.isDirty(pass))
 		{
 			return;
 		}
 
-		BufferedImage overlayImage = nativeOverlayBuffer.getImage();
-		Rectangle upload = nativeOverlayBuffer.getUploadRect();
+		BufferedImage overlayImage = nativeOverlayBuffer.getImage(pass);
+		Rectangle upload = nativeOverlayBuffer.getUploadRect(pass);
 		if (overlayImage == null || upload == null)
 		{
 			return;
@@ -1666,7 +1667,7 @@ public class GpuPlugin extends Plugin implements DrawCallbacks
 			lastOverlayHeight = height;
 		}
 
-		int[] pixels = nativeOverlayBuffer.getPremultipliedUploadPixels(upload);
+		int[] pixels = nativeOverlayBuffer.getPremultipliedUploadPixels(pass, upload);
 		if (pixels == null)
 		{
 			glBindTexture(GL_TEXTURE_2D, 0);
@@ -1700,7 +1701,7 @@ public class GpuPlugin extends Plugin implements DrawCallbacks
 		glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
 		glDisable(GL_BLEND);
 
-		nativeOverlayBuffer.finishComposite();
+		nativeOverlayBuffer.finishComposite(pass);
 	}
 
 	/**

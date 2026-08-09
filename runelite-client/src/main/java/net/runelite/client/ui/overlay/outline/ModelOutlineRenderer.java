@@ -723,7 +723,7 @@ public class ModelOutlineRenderer
 	{
 		if (nativePass)
 		{
-			return nativeOverlayBuffer.getImage();
+			return nativeOverlayBuffer.getImage(NativeOverlayBuffer.Pass.UNDER_UI);
 		}
 		MainBufferProvider bufferProvider = (MainBufferProvider) client.getBufferProvider();
 		return (BufferedImage) bufferProvider.getImage();
@@ -1098,7 +1098,7 @@ public class ModelOutlineRenderer
 
 		if (nativePass)
 		{
-			nativeOverlayBuffer.markDirty();
+			nativeOverlayBuffer.markDirty(NativeOverlayBuffer.Pass.UNDER_UI);
 		}
 
 		resetVisited(croppedWidth * croppedHeight);
